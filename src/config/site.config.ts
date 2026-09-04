@@ -8,7 +8,11 @@ export const siteConfig = {
   tagline: "Advancing Research. Connecting Knowledge.",
   description:
     "A peer-reviewed scholarly journal dedicated to advancing research and knowledge in the Social Sciences.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  // `??` only falls back on undefined, so an environment variable that exists
+  // but is empty — which is what a blank field in a hosting dashboard
+  // produces — would leave this as "". `new URL("")` then throws
+  // ERR_INVALID_URL and takes the whole build down. Treat empty as unset.
+  url: process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000",
 
   publisher: "Blue Ocean Educational Services (Pvt.) Ltd.",
   countryOfPublication: "Pakistan",
@@ -20,7 +24,9 @@ export const siteConfig = {
   issn: "",
   eIssn: "",
 
-  doiPrefix: process.env.CROSSREF_DOI_PREFIX ?? "10.xxxxx",
+  // Same trap as `url` above: an empty value here would read as a real prefix
+  // and stop `hasCrossrefPrefix()` reporting that the journal has none.
+  doiPrefix: process.env.CROSSREF_DOI_PREFIX?.trim() || "10.xxxxx",
 
   contact: {
     editorialOffice: "editorial@blueoceanresearchjournal.org",

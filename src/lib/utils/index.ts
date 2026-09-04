@@ -12,8 +12,11 @@ export function formatDate(iso: string | Date): string {
 
 /** Build a canonical absolute URL from a path. */
 export function absoluteUrl(path: string): string {
+  // `||`, not `??`: an environment variable set to an empty string is unset in
+  // every way that matters here, and treating it as a base URL produces
+  // sitemap entries like "/articles/foo" with no origin.
   const base =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+    process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "") ||
     "http://localhost:3000";
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
