@@ -9,6 +9,7 @@ import {
   resetPasswordSchema,
 } from "@/lib/validation/schemas";
 import { DEMO_ACCOUNTS, ROLE_COOKIE } from "@/lib/auth/current-user";
+import { isDemoMode } from "@/lib/auth/demo-mode";
 
 /**
  * Auth Server Actions.
@@ -73,12 +74,11 @@ export async function signIn(
   // redirect to the `next` parameter or the dashboard.
   await new Promise((r) => setTimeout(r, 400));
 
-  // DEVELOPMENT ONLY — demo accounts, so the portal can be walked without a
-  // backend. Each address maps to a role; the password is ignored entirely.
-  // Guarded on NODE_ENV rather than a comment, so a production build cannot
-  // ship a login that accepts anything: there, this block does not exist and
-  // the message below is what every attempt returns.
-  if (process.env.NODE_ENV !== "production") {
+  // Demo accounts, so the portal can be walked without a backend. Each address
+  // maps to a role; the password is ignored entirely. Available in development
+  // and on preview deployments, never on the production domain — the guard is
+  // the environment itself, not a comment someone has to remember to remove.
+  if (isDemoMode()) {
     const role = DEMO_ACCOUNTS[parsed.data.email.trim().toLowerCase()];
     if (role) {
       cookies().set(ROLE_COOKIE, role, {

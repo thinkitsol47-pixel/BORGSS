@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
+import { isDemoMode } from "@/lib/auth/demo-mode";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -20,5 +21,7 @@ export default function Page({
   const next =
     raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : undefined;
 
-  return <LoginForm next={next} />;
+  // Decided on the server: the form is a client component and cannot read
+  // VERCEL_ENV itself.
+  return <LoginForm next={next} demoMode={isDemoMode()} />;
 }

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { ROLES, type Role } from "@/config/roles";
+import { isDemoMode } from "./demo-mode";
 
 export type CurrentUser = {
   id: string;
@@ -74,11 +75,23 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   };
 }
 
-/** The role a demo sign-in selected, if any. Never honoured in production. */
+/**
+ * The role a demo sign-in selected, if any.
+ *
+ * Never honoured on the production domain — see `isDemoMode()`.
+ *
+ * `cookies()` is read **before** that check, not after, and the order is
+ * load-bearing. Reading it is what marks a page dynamic; returning early would
+ * let Next prerender every portal screen at build time, when no request and no
+ * cookie exist — and the built HTML would then be served to everyone whatever
+ * their cookie said. That is exactly what happened before this comment: a
+ * preview deployment showed the demo panel but every admin route still
+ * redirected, because the pages had been baked as a section editor.
+ */
 function devRole(): Role | null {
-  if (process.env.NODE_ENV === "production") return null;
-
   const value = cookies().get(ROLE_COOKIE)?.value;
+
+  if (!isDemoMode()) return null;
   if (!value || !ROLES.includes(value as Role)) return null;
   return value as Role;
 }

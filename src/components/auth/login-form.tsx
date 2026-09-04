@@ -14,7 +14,16 @@ import {
 
 const initialState: AuthState = { status: "idle" };
 
-export function LoginForm({ next }: { next?: string }) {
+export function LoginForm({
+  next,
+  /* Passed in from the page: this is a client component and cannot read the
+     server's environment, so the decision is made once on the server and the
+     answer travels here. */
+  demoMode = false,
+}: {
+  next?: string;
+  demoMode?: boolean;
+}) {
   const [state, formAction] = useFormState(signIn, initialState);
   const v = state.values ?? {};
 
@@ -26,13 +35,15 @@ export function LoginForm({ next }: { next?: string }) {
 
       <ScaffoldNotice>
         The account system is still being built, so sign-in authenticates
-        nobody. The demo accounts below open the portal in development; a real
-        address and password will not work until the backend lands.
+        nobody.{" "}
+        {demoMode
+          ? "The demo accounts below open the portal; a real address and password will not work until the backend lands."
+          : "No credentials will work until the backend lands."}
       </ScaffoldNotice>
 
-      {/* Development only — the same guard the action uses, so this panel and
-          the accounts it lists disappear together in a production build. */}
-      {process.env.NODE_ENV !== "production" && <DemoAccounts />}
+      {/* The same guard the sign-in action uses, so this panel and the
+          accounts it lists appear and disappear together. */}
+      {demoMode && <DemoAccounts />}
 
       <form action={formAction} className="space-y-5" noValidate>
         {next && <input type="hidden" name="next" value={next} />}
@@ -148,11 +159,11 @@ function DemoAccounts() {
   return (
     <details className="mb-6 rounded-lg border border-brand-border bg-brand-tint/30 p-3.5">
       <summary className="cursor-pointer text-xs font-semibold text-brand-darker">
-        Demo accounts (development only)
+        Demo accounts
       </summary>
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
         Enter one of these addresses with any password. Every account is a real
-        row in the user directory.
+        row in the user directory. This panel is not shown on the live site.
       </p>
       <ul className="mt-2.5 space-y-2">
         {accounts.map((a) => (
