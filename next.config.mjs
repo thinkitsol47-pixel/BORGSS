@@ -28,6 +28,11 @@ const nextConfig = {
   // Double-invoking every render is a useful production-correctness check but
   // roughly doubles compile work, which is painful on this synced-folder disk.
   reactStrictMode: !isDev,
+  // Lint is run on its own (`npm run lint`), so running it again inside the
+  // build only makes deploys slower. This does NOT skip type checking —
+  // `next build` still fails on a type error, and `npm run typecheck` runs
+  // separately. Keep both in the pre-push routine.
+  eslint: { ignoreDuringBuilds: true },
   poweredByHeader: false,
   images: {
     remotePatterns: [
