@@ -1,0 +1,270 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ---------------------------------------------------------------- *
+     * TYPE
+     * --font-sans / --font-serif are injected by next/font/local
+     * (see src/lib/fonts.ts): Inter for UI, Source Serif 4 for headings
+     * and article text. Fallbacks are declared there, not here.
+     * ---------------------------------------------------------------- */
+
+    /* ---------------------------------------------------------------- *
+     * SURFACES — pure white everywhere.
+     * Sections are separated by hairline borders and space, never by a
+     * grey background band. `--muted` exists only for small inset chips
+     * and hover states, not for full-width page sections.
+     * ---------------------------------------------------------------- */
+    --background: 0 0% 100%;
+    --foreground: 222 40% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 40% 11%;
+
+    /* Secondary text. Kept dark enough to read comfortably at 14–15px:
+       ~7.2:1 on white. Do not lighten this — body copy uses it. */
+    --muted: 204 45% 97%;
+    --muted-foreground: 217 19% 35%;
+
+    /* ---------------------------------------------------------------- *
+     * BRAND — bright sky blue.
+     *
+     * Two steps, and the distinction matters for accessibility:
+     *   --brand  #0EA5E9  ~3.1:1 on white — surfaces only (filled buttons,
+     *            bars, strips, large display text, borders, icons ≥24px).
+     *   --primary #0284C7 ~4.6:1 on white — anything that is TEXT on a white
+     *            ground (links, small labels, outline-button text).
+     * Never use --brand for small text on white.
+     * ---------------------------------------------------------------- */
+    /* ONE hue (199) for the whole identity — only lightness changes.
+       Every sky-blue surface on the site must come from these five. */
+    --brand: 199 89% 48%; /* #0EA5E9  fills, bars, panels          */
+    --brand-foreground: 0 0% 100%;
+    --brand-dark: 199 89% 42%; /*          hover, gradient start       */
+    --brand-darker: 199 85% 31%; /*          text on a tinted ground     */
+    --brand-tint: 199 90% 95%; /*          soft chips, hover washes    */
+    /* Softer sky, for borders that should sit back (form fields, dividers). */
+    --brand-border: 199 75% 76%;
+
+    /* Same hue, dark enough for small text on white (~4.6:1). */
+    --primary: 199 92% 37%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Gradient end only — never used on its own for text. */
+    --accent: 197 88% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    /* ---------------------------------------------------------------- *
+     * LINES + STATE
+     * ---------------------------------------------------------------- */
+    --border: 214 25% 91%;
+    --border-strong: 214 20% 84%;
+    --input: 214 22% 88%;
+    --ring: 199 89% 48%;
+
+    --success: 152 55% 34%;
+    --warning: 32 90% 40%;
+    --danger: 0 70% 45%;
+
+    --radius: 0.625rem;
+
+    /* ---------------------------------------------------------------- *
+     * STICKY HEADER
+     * SiteHeader is sticky and stacks three strips: the utility bar
+     * (h-9 = 2.25rem), the masthead (py-4 around a 2.75rem logo ≈ 4.75rem)
+     * and the nav bar (≈ 3.25rem desktop, ≈ 3.25rem mobile). That is about
+     * 10.25rem; the offset adds ~1rem so a jumped-to heading is not flush
+     * against the header. Used for scroll-margin on in-page anchors and for
+     * the sticky rail's own top. Change it here if the header changes.   */
+    --header-offset: 11.25rem;
+  }
+
+  @media (min-width: 1024px) {
+    :root {
+      /* the nav bar is slightly taller on desktop (py-3.5 vs py-2) */
+      --header-offset: 11.5rem;
+    }
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    /* "On this page" links glide to the section rather than teleporting, so
+       the reader keeps their bearings. The reduced-motion block below turns
+       this off for anyone who has asked the OS for less movement. */
+    scroll-behavior: smooth;
+  }
+
+  /* Any element that can be jumped to by a #fragment clears the sticky
+     header, so its heading is visible on arrival rather than scrolled
+     underneath. Covers the section-per-heading pages (APC, indexing) that
+     sit outside .prose; .prose headings set the same offset themselves. */
+  :target,
+  [id]:is(h1, h2, h3, h4, section, article) {
+    scroll-margin-top: var(--header-offset);
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headings default to the serif voice of the journal. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-serif tracking-tight;
+    text-wrap: balance;
+  }
+
+  /* One consistent focus ring across links, buttons and fields. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  ::selection {
+    background-color: hsl(var(--brand-tint));
+    color: hsl(var(--brand-darker));
+  }
+}
+
+@layer components {
+  /* ------------------------------------------------------------------ *
+   * Long-form body — article text, policy pages, guidelines.
+   * Serif at a comfortable reading measure; headings and links carry the
+   * brand, everything else stays quiet.
+   * ------------------------------------------------------------------ */
+  .prose {
+    @apply font-serif text-[1.0625rem] leading-[1.75] text-foreground;
+    max-width: 44rem;
+  }
+
+  /* `.not-prose` opts a block out: components dropped into a prose body
+     (buttons, cards, tables of their own) keep their own styling instead of
+     being restyled as body copy. Every rule below is scoped past it. */
+  .not-prose,
+  .not-prose * {
+    @apply font-sans;
+  }
+
+  .prose > :not(.not-prose) + :not(.not-prose) {
+    @apply mt-5;
+  }
+  .prose > .not-prose {
+    @apply my-6;
+  }
+
+  /* Jumping to a #id must land with the heading visible, not scrolled under
+     the sticky header. --header-offset is the header's real height plus a
+     little breathing room; it is defined with the tokens, so changing the
+     header height means changing one value there. */
+  .prose h2:not(.not-prose *) {
+    @apply mt-10 font-serif text-2xl font-bold;
+    scroll-margin-top: var(--header-offset);
+  }
+  .prose h3:not(.not-prose *) {
+    @apply mt-8 font-serif text-xl font-semibold;
+    scroll-margin-top: var(--header-offset);
+  }
+  .prose h4:not(.not-prose *) {
+    @apply mt-6 font-serif text-lg font-semibold;
+    scroll-margin-top: var(--header-offset);
+  }
+  .prose :is(h2, h3, h4) + :not(.not-prose) {
+    @apply mt-3;
+  }
+
+  .prose a:not(.not-prose *) {
+    @apply font-medium text-primary underline decoration-brand/35 underline-offset-4 transition-colors hover:text-brand-dark hover:decoration-brand;
+  }
+
+  .prose strong:not(.not-prose *) {
+    @apply font-semibold;
+  }
+
+  .prose :is(ul, ol):not(.not-prose *) {
+    @apply space-y-2 pl-6;
+  }
+  .prose ul:not(.not-prose *) {
+    @apply list-disc marker:text-brand;
+  }
+  .prose ol:not(.not-prose *) {
+    @apply list-decimal marker:font-medium marker:text-brand-dark;
+  }
+
+  .prose blockquote:not(.not-prose *) {
+    @apply border-l-2 border-brand pl-5 italic text-foreground/85;
+  }
+
+  .prose hr:not(.not-prose *) {
+    @apply my-10 border-border;
+  }
+
+  .prose code:not(.not-prose *) {
+    @apply rounded bg-brand-tint px-1.5 py-0.5 font-sans text-[0.85em] text-brand-darker;
+  }
+
+  .prose table:not(.not-prose *) {
+    @apply w-full border-collapse font-sans text-sm;
+  }
+  .prose th:not(.not-prose *) {
+    @apply border-b border-brand-border bg-brand-tint/40 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-brand-darker;
+  }
+  .prose td:not(.not-prose *) {
+    @apply border-b border-border px-3 py-2 align-top;
+  }
+
+  .prose figcaption:not(.not-prose *) {
+    @apply font-sans text-sm text-muted-foreground;
+  }
+
+  /* Hairline rule used to separate full-width sections on white. */
+  .hairline {
+    @apply border-t border-border;
+  }
+
+  /* Inline link with a sky underline that draws in on hover. */
+  .link-underline {
+    @apply text-primary decoration-brand/40 underline-offset-4 transition-colors hover:text-brand-dark hover:underline hover:decoration-brand;
+  }
+}
+
+@layer utilities {
+  /* Soft sky glow behind a hero — keeps the page white, adds depth. */
+  .bg-brand-glow {
+    background-image: radial-gradient(
+      60rem 30rem at 50% -8rem,
+      hsl(var(--brand) / 0.13),
+      transparent 70%
+    );
+  }
+
+  /* Single, consistent brand gradient. Narrow range so every panel that
+     uses it reads as the same blue. */
+  .bg-brand-gradient {
+    background-image: linear-gradient(
+      105deg,
+      hsl(var(--brand-dark)),
+      hsl(var(--brand)) 60%,
+      hsl(var(--accent))
+    );
+  }
+
+  /* Respect users who have asked the OS for less motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

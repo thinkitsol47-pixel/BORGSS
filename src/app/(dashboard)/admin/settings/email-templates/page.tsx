@@ -1,0 +1,368 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { requireGroup } from "@/lib/auth/require-role";
+import { SettingsPage, SourceNote } from "@/components/layout/settings-page";
+import { siteConfig } from "@/config/site.config";
+import { Alert } from "@/components/ui";
+import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = { title: "Email Templates" };
+
+/**
+ * The mail the platform would send, if it could send mail.
+ *
+ * Nothing here exists in code: there is no mail provider, no template file and
+ * no send. This screen is therefore a **specification**, like the audit log,
+ * and it says so at the top rather than rendering empty template editors that
+ * would look like a feature waiting for content.
+ *
+ * What it can do usefully is enumerate every message the portal has promised
+ * elsewhere. Each `TODO(backend)` in the codebase that says "email the author"
+ * is a template that has to exist, and gathering them in one place is how that
+ * list stops being discovered one screen at a time.
+ */
+
+type Trigger = {
+  name: string;
+  /** What causes it to be sent. */
+  when: string;
+  to: string;
+  /** Where in the app this promise was made. */
+  promisedBy: string;
+  href?: string;
+  /** True when nothing at all happens today, not even a manual workaround. */
+  critical?: boolean;
+};
+
+const TRIGGERS: { group: string; items: Trigger[] }[] = [
+  {
+    group: "Account",
+    items: [
+      {
+        name: "Verify your email address",
+        when: "An account is registered.",
+        to: "The new account holder",
+        promisedBy: "Registration, and the verify-email screen",
+        href: "/register",
+        critical: true,
+      },
+      {
+        name: "Reset your password",
+        when: "A password reset is requested.",
+        to: "The account holder",
+        promisedBy: "Forgot-password screen",
+        href: "/forgot-password",
+        critical: true,
+      },
+      {
+        name: "You have been invited",
+        when: "An administrator creates an account for someone.",
+        to: "The invited person",
+        promisedBy: "Users screen — an account sits at status “invited”",
+        href: "/admin/users",
+        critical: true,
+      },
+    ],
+  },
+  {
+    group: "Submission",
+    items: [
+      {
+        name: "Submission received",
+        when: "A manuscript is submitted through the wizard.",
+        to: "The corresponding author",
+        promisedBy: "Wizard step 6, which currently says no receipt is sent",
+        href: "/submissions/new",
+      },
+      {
+        name: "Revision requested",
+        when: "An editor records a minor or major revision.",
+        to: "The corresponding author, with the decision letter",
+        promisedBy: "Decision screen",
+      },
+      {
+        name: "Decision — accepted or declined",
+        when: "An editor records a decision.",
+        to: "The corresponding author, with the letter and optionally the reports",
+        promisedBy: "Decision screen",
+      },
+      {
+        name: "Revision due soon",
+        when: "A revision deadline approaches.",
+        to: "The corresponding author",
+        promisedBy: "Author submission pages show a revision due date",
+        href: "/submissions",
+      },
+    ],
+  },
+  {
+    group: "Review",
+    items: [
+      {
+        name: "Invitation to review",
+        when: "An editor invites a reviewer.",
+        to: "The invited reviewer",
+        promisedBy: "Reviewer assignment screen",
+        critical: true,
+      },
+      {
+        name: "Review reminder",
+        when: "A review is approaching or past its due date.",
+        to: "The reviewer",
+        promisedBy: "Reviewer screens show due dates and overdue states",
+        href: "/reviews",
+      },
+      {
+        name: "Thank you, and the outcome",
+        when: "A decision is reached on a manuscript someone reviewed.",
+        to: "Every reviewer who reported",
+        promisedBy: "Decision screen’s backend notes",
+      },
+    ],
+  },
+  {
+    group: "Production and publication",
+    items: [
+      {
+        name: "Copyedits for your approval",
+        when: "Copyediting is sent to the author.",
+        to: "The corresponding author",
+        promisedBy: "Copyediting stage — “with the author” is a tracked state",
+      },
+      {
+        name: "Proofs for your approval",
+        when: "A galley is sent for proofreading.",
+        to: "The corresponding author",
+        promisedBy: "Proofreading stage",
+      },
+      {
+        name: "Your article is published",
+        when: "An issue containing the article is published.",
+        to: "All contributors",
+        promisedBy: "Issue screens",
+        href: "/editorial/issues",
+      },
+    ],
+  },
+  {
+    group: "Public forms",
+    items: [
+      {
+        name: "Contact form received",
+        when: "Someone submits the public contact form.",
+        to: "The editorial office, and an acknowledgement to the sender",
+        promisedBy: "Contact form — validates but does not send",
+        href: "/contact",
+        critical: true,
+      },
+      {
+        name: "Reviewer application received",
+        when: "Someone applies to join the reviewer pool.",
+        to: "The editorial office, and an acknowledgement to the applicant",
+        promisedBy: "Become a reviewer — validates but does not send",
+        href: "/for-reviewers/become-a-reviewer",
+        critical: true,
+      },
+    ],
+  },
+];
+
+export default async function Page() {
+  await requireGroup("adminOnly");
+
+  const all = TRIGGERS.flatMap((g) => g.items);
+  const critical = all.filter((t) => t.critical);
+
+  return (
+    <SettingsPage
+      active="email-templates"
+      title="Email templates"
+      lead="Every message this platform has promised to send, and what happens instead today."
+    >
+      <Alert tone="warning" title="No template exists, and nothing is sent">
+        <p>
+          There is no mail provider connected and no template file anywhere in
+          the codebase. This screen is a specification of the{" "}
+          <span className="font-medium">{all.length}</span> messages the portal
+          has promised elsewhere — every{" "}
+          <code className="font-mono text-[0.9em]">TODO(backend)</code> that
+          says &ldquo;email the author&rdquo; is a template that has to exist.
+        </p>
+        <p className="mt-2">
+          Gathering them here is the point: otherwise the list is discovered one
+          screen at a time, and the one that gets forgotten is the one nobody
+          was looking at.
+        </p>
+      </Alert>
+
+      {/* The ones with no workaround at all come next — the rest can at least
+          be done by hand from the editorial office. */}
+      {critical.length > 0 && (
+        <section aria-labelledby="critical-heading" className="mt-8">
+          <h2
+            id="critical-heading"
+            className="font-serif text-lg font-semibold"
+          >
+            {critical.length} have no manual alternative
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            A decision letter can be sent by hand from the editorial office. A
+            password reset cannot — nobody can act on these without a mail
+            provider, which is why they gate the launch rather than merely
+            slowing it.
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {critical.map((t) => (
+              <li
+                key={t.name}
+                className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs font-medium text-warning"
+              >
+                {t.name}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ------------------------------------------------------- the list */}
+      {TRIGGERS.map((group) => (
+        <section
+          key={group.group}
+          aria-labelledby={`g-${group.group}`}
+          className="mt-10"
+        >
+          <h2
+            id={`g-${group.group}`}
+            className="font-serif text-lg font-semibold"
+          >
+            {group.group}
+          </h2>
+          <ul className="mt-3 divide-y rounded-xl border">
+            {group.items.map((t) => (
+              <li
+                key={t.name}
+                className={cn("p-4", t.critical && "bg-warning/5")}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{t.name}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      {t.when}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full border border-border-strong bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                    Not built
+                  </span>
+                </div>
+
+                <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
+                  <div className="flex gap-1.5">
+                    <dt>To</dt>
+                    <dd className="font-medium text-foreground">{t.to}</dd>
+                  </div>
+                  <div className="flex min-w-0 gap-1.5">
+                    <dt>Promised by</dt>
+                    <dd className="min-w-0 font-medium text-foreground">
+                      {t.href ? (
+                        <Link href={t.href} className="text-primary hover:underline">
+                          {t.promisedBy}
+                        </Link>
+                      ) : (
+                        t.promisedBy
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+
+      {/* ------------------------------------------------ what they need */}
+      <section aria-labelledby="requirements-heading" className="mt-10">
+        <h2
+          id="requirements-heading"
+          className="font-serif text-lg font-semibold"
+        >
+          What the real templates have to get right
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          Recorded now because these are the decisions that are expensive to
+          change once mail is going out.
+        </p>
+        <dl className="mt-4 divide-y rounded-xl border">
+          {REQUIREMENTS.map((r) => (
+            <div key={r.title} className="p-4">
+              <dt className="text-sm font-medium">{r.title}</dt>
+              <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {r.detail}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <SourceNote file="No file — nothing exists yet">
+        <p>
+          Unlike every other settings screen, this one documents something that
+          has not been written. When a mail provider is connected, the templates
+          belong beside the Server Actions that trigger them, and this screen
+          becomes their index.
+        </p>
+        <p className="mt-2">
+          All correspondence goes out by hand from{" "}
+          <span className="font-medium">
+            {siteConfig.contact.editorialOffice}
+          </span>{" "}
+          in the meantime — which is what every &ldquo;not built yet&rdquo;
+          notice in the portal already tells its reader.{" "}
+          <Link
+            href="/admin/integrations"
+            className="font-medium text-primary hover:underline"
+          >
+            See integrations
+          </Link>
+          .
+        </p>
+      </SourceNote>
+    </SettingsPage>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Pieces
+ * ------------------------------------------------------------------ */
+
+const REQUIREMENTS = [
+  {
+    title: "Every message quotes the manuscript reference",
+    detail:
+      "BORJSS-2026-0042 in the subject line. It is what the author quotes back, what the editorial office searches on, and what makes a reply threadable when the portal cannot thread it.",
+  },
+  {
+    title: "Nothing sent to an author may contain a reviewer's identity",
+    detail:
+      "The journal is double-blind. Comments to the author go out; comments to the editor never do, under any setting. This is enforced in the type on screen and must be enforced again at the point of send.",
+  },
+  {
+    title: "Plain text alongside HTML",
+    detail:
+      "Institutional mail systems strip or mangle HTML, and a decision letter that arrives unreadable is a complaint. The plain-text part is the letter, not a “view in browser” link.",
+  },
+  {
+    title: "Reminders stop when the thing is done",
+    detail:
+      "A reviewer who has returned their report must never receive another reminder for it. The obvious bug in every reminder system, and the one that loses reviewers.",
+  },
+  {
+    title: "The unsubscribable and the unsubscribable-not are separated",
+    detail:
+      "Decision letters, revision requests and account security mail are sent regardless of notification preferences — the profile screen already says so. Reminders and announcements are not. The template has to know which it is.",
+  },
+  {
+    title: "A send is recorded",
+    detail:
+      "Who it went to, when, and which template. An author saying “I never received the decision” is answerable only if the send was logged.",
+  },
+];
