@@ -1,5 +1,5 @@
 /**
- * Build output goes to `.next-build` rather than `.next`.
+ * Build output goes to `.next-build` rather than `.next` — **locally only**.
  *
  * Two dev servers that share one build directory will corrupt each other:
  * when one exits it cleans the directory out from under the other, which
@@ -8,16 +8,25 @@
  *
  * Set BORJSS_DIST_SUFFIX to give a throwaway server its own directory,
  * e.g. `BORJSS_DIST_SUFFIX=check npx next dev -p 3099`.
+ *
+ * On Vercel the directory stays `.next`. Vercel looks for that name after the
+ * build and fails with "The Next.js output directory .next was not found"
+ * against anything else — the local collision this solves does not exist on a
+ * build machine that runs one build and then stops.
  */
 
 const isDev = process.env.NODE_ENV === "development";
+
+// Vercel sets VERCEL=1 on every build and runtime container.
+const onVercel = Boolean(process.env.VERCEL);
+
 const distSuffix = process.env.BORJSS_DIST_SUFFIX
   ? `-${process.env.BORJSS_DIST_SUFFIX}`
   : "";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  distDir: `.next-build${distSuffix}`,
+  ...(onVercel ? {} : { distDir: `.next-build${distSuffix}` }),
   // Next rewrites tsconfig's `include` to point at its own generated types.
   // A throwaway server would therefore add a path to a directory that is
   // deleted afterwards, leaving the editor reporting missing files — so give
