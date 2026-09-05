@@ -4,6 +4,7 @@ import { Megaphone, Pencil, Plus } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
 import { getPosts } from "@/lib/api/articles";
 import { PortalPage } from "@/components/layout/portal-page";
+import { PostDeleteButton } from "@/components/portal/post-delete-button";
 import { Alert, Badge, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -196,6 +197,7 @@ function PostRow({ post }: { post: Post }) {
             <Pencil className="size-3" aria-hidden />
             Edit
           </Link>
+          <PostDeleteButton title={post.title} />
           <Badge variant="outline" size="sm">
             {KIND_LABEL[post.kind]}
           </Badge>

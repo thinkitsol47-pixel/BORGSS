@@ -6,6 +6,7 @@ import { listUsers, type UserSort } from "@/lib/api/admin";
 import { assignableRoles, ROLE_LABELS, ROLES, type Role } from "@/config/roles";
 import { PortalPage } from "@/components/layout/portal-page";
 import { UserFilters } from "@/components/portal/user-filters";
+import { UserRowActions } from "@/components/portal/user-row-actions";
 import {
   Alert,
   Badge,
@@ -163,7 +164,7 @@ export default async function Page({
           </ul>
 
           <div className="mt-3 hidden md:block">
-            <Table caption="Accounts: name, roles, status, last active and joined">
+            <Table caption="Accounts: name, roles, status, last active, joined and the actions available">
               <THead>
                 <TR>
                   <TH>Name</TH>
@@ -171,6 +172,7 @@ export default async function Page({
                   <TH>Status</TH>
                   <TH>Last active</TH>
                   <TH>Joined</TH>
+                  <TH>Actions</TH>
                 </TR>
               </THead>
               <TBody>
@@ -212,6 +214,14 @@ export default async function Page({
                     </TD>
                     <TD className="whitespace-nowrap text-muted-foreground">
                       {formatDate(user.createdAt)}
+                    </TD>
+                    <TD>
+                      <UserRowActions
+                        userId={user.id}
+                        name={user.name}
+                        status={user.status}
+                        isMe={user.id === actor.id}
+                      />
                     </TD>
                   </TR>
                 ))}
@@ -381,6 +391,17 @@ function UserCard({ user, isMe }: { user: UserAccount; isMe: boolean }) {
           {user.suspendedReason}
         </p>
       )}
+
+      {/* The same actions the table row carries. A phone must not be the
+          read-only view of the portal. */}
+      <div className="mt-3 border-t pt-3">
+        <UserRowActions
+          userId={user.id}
+          name={user.name}
+          status={user.status}
+          isMe={isMe}
+        />
+      </div>
     </div>
   );
 }

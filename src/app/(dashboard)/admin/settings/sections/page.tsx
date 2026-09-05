@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AlertTriangle, Check } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
 import { SettingsPage, SourceNote } from "@/components/layout/settings-page";
+import { SectionsEditor } from "@/components/portal/sections-editor";
 import { getAllSubmissions } from "@/lib/api/editorial";
 import { ARTICLE_TYPES } from "@/lib/validation/schemas";
 import { Alert } from "@/components/ui";
@@ -108,60 +109,22 @@ export default async function Page() {
           compared between two readings.
         </p>
 
-        <ul className="mt-3 divide-y rounded-xl border">
-          {DECLARED_SECTIONS.map((name) => {
-            const count = counts.get(name) ?? 0;
-            return (
-              <li
-                key={name}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 p-3"
-              >
-                <span className="min-w-0 text-sm font-medium">{name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {count === 0 ? (
-                    "No manuscripts"
-                  ) : (
-                    <Link
-                      href={`/editorial/queue?section=${encodeURIComponent(name)}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {count} {count === 1 ? "manuscript" : "manuscripts"}
-                    </Link>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-
-          {/* Undeclared names are listed in place, marked — not filtered out.
-              Hiding them is how the drift survives. */}
-          {undeclared.map((name) => (
-            <li
-              key={name}
-              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 bg-warning/5 p-3"
-            >
-              <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-                <AlertTriangle
-                  className="size-3.5 shrink-0 text-warning"
-                  aria-hidden
-                />
-                {name}
-                <span className="text-xs font-normal text-warning">
-                  not declared
-                </span>
-              </span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                <Link
-                  href={`/editorial/queue?section=${encodeURIComponent(name)}`}
-                  className="font-medium text-primary hover:underline"
-                >
-                  {counts.get(name)}{" "}
-                  {counts.get(name) === 1 ? "manuscript" : "manuscripts"}
-                </Link>
-              </span>
-            </li>
-          ))}
-        </ul>
+        <SectionsEditor
+          initial={[
+            ...DECLARED_SECTIONS.map((name) => ({
+              name,
+              count: counts.get(name) ?? 0,
+              declared: true,
+            })),
+            // Undeclared names are listed in place, marked — not filtered out.
+            // Hiding them is how the drift survives.
+            ...undeclared.map((name) => ({
+              name,
+              count: counts.get(name) ?? 0,
+              declared: false,
+            })),
+          ]}
+        />
 
         {unused.length > 0 && (
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
