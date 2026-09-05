@@ -17,6 +17,18 @@
  * whether demo mode is on.
  */
 export function isDemoMode(): boolean {
+  // The deliberate override, for showing the client a stable URL.
+  //
+  // Preview deployments get a new hostname on every push, so demoing from one
+  // means sending a fresh link each time. Setting BORJSS_DEMO=1 in the Vercel
+  // project opens the demo on the production domain instead — and unsetting it
+  // closes every demo route again with no code change and no deploy, which is
+  // the property that makes it safe to leave this switch in the codebase.
+  //
+  // Read before the environment checks, so it can open demo mode where they
+  // would close it. Any other value is off, so BORJSS_DEMO=0 reads as off.
+  if (process.env.BORJSS_DEMO === "1") return true;
+
   // Any local run — `next dev`, and a local production build.
   if (!process.env.VERCEL) return process.env.NODE_ENV !== "production";
 

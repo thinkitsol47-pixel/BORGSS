@@ -98,6 +98,36 @@ export async function signIn(
   };
 }
 
+/* ------------------------------------------------------- one-click demo in */
+
+/**
+ * Opens the portal as a super administrator with no credentials at all.
+ *
+ * There is nothing to authenticate against yet, so a demo password would be a
+ * password that guards nothing while still having to be sent to whoever is
+ * being shown the portal. The guard that matters is `isDemoMode()` — unset
+ * BORJSS_DEMO and this action refuses, whether or not the button is rendered.
+ *
+ * Re-checked here rather than trusted from the page: a Server Action can be
+ * invoked without the form that submits it ever having been rendered.
+ *
+ * TODO(backend): delete this action, its button in `login-form.tsx`, and
+ * `DEMO_ACCOUNTS`, when real sessions exist.
+ */
+export async function signInAsDemoAdmin(): Promise<void> {
+  if (!isDemoMode()) {
+    throw new Error("Demo sign-in is not available.");
+  }
+
+  cookies().set(ROLE_COOKIE, "superAdmin", {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+  });
+
+  redirect("/dashboard");
+}
+
 /* --------------------------------------------------------------- register */
 
 export async function register(

@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { useFormState } from "react-dom";
-import { LogIn, Mail } from "lucide-react";
-import { signIn, type AuthState } from "@/app/(auth)/actions";
+import { LogIn, Mail, ShieldCheck } from "lucide-react";
+import {
+  signIn,
+  signInAsDemoAdmin,
+  type AuthState,
+} from "@/app/(auth)/actions";
 import { Alert, CheckOption, Field, Input } from "@/components/ui";
 import {
   AuthHeading,
@@ -37,13 +41,18 @@ export function LoginForm({
         The account system is still being built, so sign-in authenticates
         nobody.{" "}
         {demoMode
-          ? "The demo accounts below open the portal; a real address and password will not work until the backend lands."
+          ? "The demo entry below opens the portal; a real address and password will not work until the backend lands."
           : "No credentials will work until the backend lands."}
       </ScaffoldNotice>
 
-      {/* The same guard the sign-in action uses, so this panel and the
-          accounts it lists appear and disappear together. */}
-      {demoMode && <DemoAccounts />}
+      {/* The same guard the sign-in action uses, so these panels and the
+          accounts they list appear and disappear together. */}
+      {demoMode && (
+        <>
+          <DemoAdminEntry />
+          <DemoAccounts />
+        </>
+      )}
 
       <form action={formAction} className="space-y-5" noValidate>
         {next && <input type="hidden" name="next" value={next} />}
@@ -110,6 +119,43 @@ export function LoginForm({
         </Link>
       </p>
     </>
+  );
+}
+
+/**
+ * One-click entry to the portal as a super administrator.
+ *
+ * Deliberately credential-free. A demo password guards nothing — it has to be
+ * handed to whoever is being shown the portal, so it is not a secret, and all
+ * it adds is a step to mistype. What actually closes this door is
+ * `isDemoMode()`: unset BORJSS_DEMO and both this button and the action behind
+ * it are gone, with no code change.
+ *
+ * Super administrator because it is the only role that reaches every screen —
+ * `audit.view` and `platform.manage` are withheld even from `admin`, so a
+ * demo signed in as anything less would hit a redirect while being walked
+ * through the portal. The panel below still lists the narrower roles, since
+ * seeing what each role *cannot* reach is the other half of the demo.
+ */
+function DemoAdminEntry() {
+  return (
+    <form action={signInAsDemoAdmin} className="mb-6">
+      <div className="rounded-lg border border-brand-border bg-brand-tint/40 p-4">
+        <p className="text-sm font-semibold text-brand-darker">
+          Open the portal without signing in
+        </p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+          Enters as a super administrator, which reaches every screen. No
+          password is needed — nothing is being authenticated.
+        </p>
+        <div className="mt-3.5">
+          <SubmitButton pendingLabel="Opening the portal…">
+            <ShieldCheck className="size-4" aria-hidden />
+            Enter as super administrator
+          </SubmitButton>
+        </div>
+      </div>
+    </form>
   );
 }
 

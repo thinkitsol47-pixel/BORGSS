@@ -1241,6 +1241,31 @@ order:
 - **An ISSN and e-ISSN.** With the prefix, these are the three fields that block
   a DOAJ application.
 
+### The demo door — remove it when auth lands
+
+The portal can be walked with no credentials at all. `/login` carries an
+**"Enter as super administrator"** button that sets `borjss_dev_role` and
+redirects to `/dashboard`; the six demo addresses below it still work with any
+password. Super administrator because it is the only role that reaches every
+screen — `audit.view` and `platform.manage` are withheld even from `admin`, so
+a demo signed in as anything less hits a redirect mid-walkthrough.
+
+A demo *password* was considered and rejected: it has to be handed to whoever
+is being shown the portal, so it is not a secret, and all it adds is a step to
+mistype. **The guard is `isDemoMode()`, not a credential.**
+
+`isDemoMode()` is now open in three cases: local runs, Vercel preview
+deployments, and **`BORJSS_DEMO=1`**. That third one exists because preview
+URLs change on every push, so demoing from one means sending a fresh link each
+time; setting the variable on the Vercel project opens the demo on the stable
+production domain instead. Unsetting it closes every demo route again with no
+code change and no deploy — that property is what makes the switch safe to
+leave in the codebase.
+
+**When auth lands, delete:** `signInAsDemoAdmin` in `(auth)/actions.ts`, its
+`DemoAdminEntry` and `DemoAccounts` panels in `login-form.tsx`, `DEMO_ACCOUNTS`
+and the `devRole()` path in `current-user.ts`, and `demo-mode.ts` itself.
+
 ### Standing rules for whoever picks this up
 
 - Run `npm run typecheck` and `next lint` on every change.
