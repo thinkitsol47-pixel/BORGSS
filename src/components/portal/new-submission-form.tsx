@@ -7,7 +7,6 @@ import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { startSubmission, type WizardState } from "@/app/(dashboard)/submissions/actions";
 import {
   ARTICLE_TYPES,
-  REVIEWER_SUBJECTS,
 } from "@/lib/validation/schemas";
 import {
   Alert,
@@ -25,7 +24,15 @@ const initialState: WizardState = { status: "idle" };
 
 const TITLE_MAX = 300;
 
-export function NewSubmissionForm() {
+/**
+ * Wizard step 1.
+ *
+ * **The section list comes from the database, not from a constant.** It used to
+ * render `REVIEWER_SUBJECTS`, a list maintained for the reviewer directory —
+ * so an author could pick a subject that had no `Section` row, and the action
+ * would reject a choice the form had offered. The page passes the registry.
+ */
+export function NewSubmissionForm({ sections }: { sections: string[] }) {
   const [state, formAction] = useFormState(startSubmission, initialState);
   const [title, setTitle] = useState(state.values?.title ?? "");
 
@@ -129,7 +136,7 @@ export function NewSubmissionForm() {
                 <option value="" disabled>
                   Choose a section
                 </option>
-                {REVIEWER_SUBJECTS.map((s) => (
+                {sections.map((s) => (
                   <option key={s} value={s}>
                     {s}
                   </option>

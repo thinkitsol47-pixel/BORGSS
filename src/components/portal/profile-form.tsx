@@ -21,7 +21,7 @@ export function ProfileForm({ user }: { user: CurrentUser }) {
   return (
     <form action={formAction} className="max-w-2xl space-y-6" noValidate>
       {state.status === "success" && (
-        <Alert tone="info" title="Not saved">
+        <Alert tone="success" title="Saved">
           {state.message}
         </Alert>
       )}
@@ -70,7 +70,7 @@ export function ProfileForm({ user }: { user: CurrentUser }) {
       >
         <Input
           name="institution"
-          defaultValue={v.institution ?? ""}
+          defaultValue={v.institution ?? user.affiliation ?? ""}
           autoComplete="organization"
           placeholder="University or organisation"
           icon={<Building2 />}
@@ -84,7 +84,7 @@ export function ProfileForm({ user }: { user: CurrentUser }) {
           optional
           error={state.errors?.department}
         >
-          <Input name="department" defaultValue={v.department ?? ""} />
+          <Input name="department" defaultValue={v.department ?? user.department ?? ""} />
         </Field>
 
         <Field
@@ -96,7 +96,7 @@ export function ProfileForm({ user }: { user: CurrentUser }) {
         >
           <Input
             name="position"
-            defaultValue={v.position ?? ""}
+            defaultValue={v.position ?? user.position ?? ""}
             autoComplete="organization-title"
           />
         </Field>
@@ -110,7 +110,7 @@ export function ProfileForm({ user }: { user: CurrentUser }) {
       >
         <Input
           name="country"
-          defaultValue={v.country ?? ""}
+          defaultValue={v.country ?? user.country ?? ""}
           autoComplete="country-name"
           list="country-list"
           placeholder="Start typing…"
@@ -134,7 +134,7 @@ export function ProfileForm({ user }: { user: CurrentUser }) {
           name="bio"
           rows={5}
           maxLength={BIO_MAX}
-          defaultValue={v.bio ?? ""}
+          defaultValue={v.bio ?? user.bio ?? ""}
         />
       </Field>
 

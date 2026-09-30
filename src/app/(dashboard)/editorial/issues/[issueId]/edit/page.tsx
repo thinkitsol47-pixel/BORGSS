@@ -27,11 +27,16 @@ export default async function Page({
         { title: issueLabel(issue), href: `/editorial/issues/${issue.id}` },
       ]}
     >
+      {/* The issue screen stops offering an Edit button once an issue is
+          published, so this is reachable only by typing the URL — and
+          `saveIssue` refuses it either way. The notice says so rather than
+          letting someone fill the form in and be turned away at the end. */}
       {issue.state === "published" && (
-        <Alert tone="warning" title="This issue is already published">
+        <Alert tone="warning" title="This issue is published and cannot be edited">
           Its volume, number and year appear in the citation of every article it
           carries, and those citations are in other people&rsquo;s bibliographies
-          now. Changing them here would not change them there.
+          now. Changing them here would not change them there, so this form will
+          not save.
         </Alert>
       )}
 

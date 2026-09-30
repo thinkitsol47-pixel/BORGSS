@@ -21,11 +21,38 @@ const initialState: WizardState = { status: "idle" };
 
 const TITLE_MAX = 300;
 
-export function WizardMetadataForm({ draftId }: { draftId: string }) {
+/** What the draft already holds, so the form opens on it rather than empty. */
+export type SavedMetadata = {
+  title: string;
+  abstract: string;
+  keywords: string[];
+  funding: string | null;
+  conflictOfInterest: string | null;
+};
+
+export function WizardMetadataForm({
+  draftId,
+  saved,
+}: {
+  draftId: string;
+  saved?: SavedMetadata | null;
+}) {
   const [state, formAction] = useFormState(saveMetadata, initialState);
-  const [title, setTitle] = useState(state.values?.title ?? "");
-  const [abstract, setAbstract] = useState(state.values?.abstract ?? "");
-  const [keywords, setKeywords] = useState(state.values?.keywords ?? "");
+
+  /**
+   * Stored values first, then whatever a failed submit echoed back.
+   *
+   * The order matters on a re-render after a validation error: `state.values`
+   * is what the author just typed and must win over what is in the database,
+   * or a single bad field would silently revert the rest of their edits.
+   */
+  const [title, setTitle] = useState(state.values?.title ?? saved?.title ?? "");
+  const [abstract, setAbstract] = useState(
+    state.values?.abstract ?? saved?.abstract ?? "",
+  );
+  const [keywords, setKeywords] = useState(
+    state.values?.keywords ?? saved?.keywords.join(", ") ?? "",
+  );
 
   if (state.status === "success") {
     return (
@@ -40,6 +67,10 @@ export function WizardMetadataForm({ draftId }: { draftId: string }) {
 
   return (
     <form action={formAction} className="space-y-7" noValidate>
+      {/* The draft these answers belong to. The action re-checks that this
+          user owns it rather than trusting the value. */}
+      <input type="hidden" name="draftId" value={draftId} />
+
       {state.status === "error" && state.message && (
         <Alert tone="danger" title="Could not continue">
           {state.message}
@@ -127,7 +158,7 @@ export function WizardMetadataForm({ draftId }: { draftId: string }) {
         <Textarea
           name="funding"
           rows={3}
-          defaultValue={state.values?.funding}
+          defaultValue={state.values?.funding ?? saved?.funding ?? ""}
           placeholder="This work was supported by [funder] under grant [number]."
         />
       </Field>
@@ -142,7 +173,9 @@ export function WizardMetadataForm({ draftId }: { draftId: string }) {
         <Textarea
           name="conflictOfInterest"
           rows={3}
-          defaultValue={state.values?.conflictOfInterest}
+          defaultValue={
+            state.values?.conflictOfInterest ?? saved?.conflictOfInterest ?? ""
+          }
           placeholder="None."
         />
       </Field>

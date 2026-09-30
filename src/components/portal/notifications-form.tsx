@@ -84,13 +84,22 @@ const GROUPS: {
   },
 ];
 
-export function NotificationsForm() {
+export function NotificationsForm({
+  /**
+   * What this account has actually saved. Absent only before the row is read;
+   * each item then falls back to its shipped default, which is what a new
+   * account's row already holds anyway.
+   */
+  saved,
+}: {
+  saved?: Record<string, boolean>;
+}) {
   const [state, formAction] = useFormState(saveNotifications, initialState);
 
   return (
     <form action={formAction} className="max-w-2xl" noValidate>
       {state.status === "success" && (
-        <Alert tone="info" title="Not saved" className="mb-6">
+        <Alert tone="success" title="Saved" className="mb-6">
           {state.message}
         </Alert>
       )}
@@ -112,7 +121,7 @@ export function NotificationsForm() {
                   defaultChecked={
                     state.values
                       ? state.values[item.name] === "on"
-                      : item.defaultOn
+                      : (saved?.[item.name] ?? item.defaultOn)
                   }
                 />
               ))}

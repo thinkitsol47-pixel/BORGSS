@@ -13,16 +13,21 @@
  * Run: node scripts/responsive-audit.mjs http://localhost:3000
  */
 
+import { auditCookie } from "./audit-session.mjs";
+
 const base = process.argv[2] ?? "http://localhost:3000";
 
 const PAGES = [
   "/",
   "/articles",
   "/articles?type=research",
-  "/articles/climate-adaptation-smallholder-farmers",
+  // A single article's page and a single issue's page were audited through
+  // seeded slugs, removed with the rest of the invented public record
+  // (2026-09-18). Both now 404. Add them back — by real slug — once the
+  // journal publishes its first issue, since a detail page is where fixed
+  // widths and unwrappable rows most often appear.
   "/issues",
   "/issues/current",
-  "/issues/v1i1",
   "/about",
   "/about/aims-scope",
   "/about/editorial-board",
@@ -38,12 +43,13 @@ const PAGES = [
   "/for-reviewers/guidelines",
   "/for-reviewers/become-a-reviewer",
   "/indexing",
+  // The three list pages only. A single post's page used to be audited
+  // through a seeded slug, and those posts were removed with the rest of the
+  // invented public record (2026-09-18) — a hardcoded slug here would 404 for
+  // good. Add one back when the journal publishes a post of its own.
   "/announcements",
-  "/announcements/call-for-papers-volume-2",
   "/news",
-  "/news/crossref-membership-confirmed",
   "/events",
-  "/events/writing-for-publication-workshop-2027",
   // the seventeen editorial policies (step 10)
   "/policies/peer-review",
   "/policies/publication-ethics",
@@ -83,45 +89,58 @@ const PAGES = [
   "/submissions/new/d1/contributors",
   "/submissions/new/d1/declarations",
   "/submissions/new/d1/review",
-  // Editorial screens (phase 16). `q2` is a fixture with an overdue reviewer,
-  // so the queue and reviewers tab render their warning states here.
+  // Editorial screens (phase 16). Phase 3 moved these ids from mock-data
+  // fixtures to the seeded database — each id below is the real row matching
+  // the same scenario the old comment described, found by querying for it
+  // (an overdue accepted assignment; two reviewers disagreeing; a
+  // still-`planned` issue), not by guessing. Re-derive with psql against the
+  // seeded db if these ever stop matching after a reseed with different data.
   "/editorial/queue",
-  "/editorial/q2",
-  "/editorial/q2/reviewers",
+  "/editorial/f26b7674-200b-41f7-ac84-ab96e7a537d1", // overdue reviewer
+  "/editorial/f26b7674-200b-41f7-ac84-ab96e7a537d1/reviewers",
   "/editorial/reviewers-db",
-  // Decisions and issues (phase 17). `q3` is the fixture whose two reviewers
-  // disagree, so the decision screen renders its reports and warning; `s5` is
-  // the only manuscript in production, so its production tab is not the empty
-  // state. `ei3` is the issue being assembled.
-  "/editorial/q3/decision",
-  "/editorial/s5/production",
+  // Decisions and issues (phase 17). The first id's two reviewers disagree,
+  // so the decision screen renders its reports and warning; the second is
+  // `in-production`, so its production tab is not the empty state. The issue
+  // id is one still `planned` (being assembled).
+  "/editorial/f647b92f-b568-48d8-b9d7-65dcbecf366c/decision",
+  "/editorial/0cac8670-5330-4dc2-9194-2dc155f77714/production",
   "/editorial/issues",
-  "/editorial/issues/ei3",
+  "/editorial/issues/e70b5ec4-08e5-4810-98ea-9b0964112e59",
   "/admin/doi",
-  // Production (phase 18). `pj5`/`s5` is the job at proofreading with open
-  // corrections and three galleys; `p1` is the one sitting with the author,
-  // and `p3` has nothing started, so the three stage screens render their
-  // populated, waiting and empty states between them.
+  // Production (phase 18). The first id's job is at proofreading with open
+  // corrections and three galleys; the second sits with the author at
+  // copyediting; the third has nothing started — so the three stage screens
+  // render their populated, waiting and empty states between them. Real
+  // seeded submission ids, re-derived from the db the same way the editorial
+  // ids above were once `production.ts` began reading Postgres; re-derive
+  // with a Prisma query after a reseed if these stop matching.
   "/production",
-  "/production/s5/proofread",
-  "/production/s5/galleys",
-  "/production/p1/copyedit",
-  "/production/p3/copyedit",
+  "/production/c1e487cf-fc6e-41b2-87c1-f2f2c0852a09/proofread", // proofread, corrections open
+  "/production/c1e487cf-fc6e-41b2-87c1-f2f2c0852a09/galleys", // three galley versions
+  "/production/0cac8670-5330-4dc2-9194-2dc155f77714/copyedit", // with the author
+  "/production/2ae16c3a-390a-4e2f-8563-710c700756f5/copyedit", // nothing started
   "/admin/announcements",
+  // Public-form queues (phase 4). Both are card lists with a filter rail and
+  // per-row action controls — the same shape as the announcements screen.
+  "/admin/messages",
+  "/admin/reviewer-applications",
   // People and permissions (phase 19). The roles matrix is a 12x16 grid and
   // the users table is five columns, so both exercise the audit's table and
   // fixed-width rules harder than anything before them.
   "/admin/users",
   "/admin/users/new",
-  "/admin/users/u1",
-  "/admin/users/u1/edit",
+  // Dr. Mubashir Quddus — superAdmin + editorInChief, a multi-role account, so
+  // the detail and edit screens exercise the role list. Re-derive after a
+  // reseed: it is the deterministic UUID for mock id "u1" (see prisma/seed.ts).
+  "/admin/users/6cc55e24-a677-4cc8-b25e-d1646e0527d2",
+  "/admin/users/6cc55e24-a677-4cc8-b25e-d1646e0527d2/edit",
   // CRUD forms and controls. Each is a form or a set of buttons the audit has
   // not seen before, and forms are where fixed widths and unwrappable rows
   // most often creep in.
   "/admin/announcements/new",
-  "/admin/announcements/announcement/call-for-papers-volume-2/edit",
   "/editorial/issues/new",
-  "/editorial/issues/ei3/edit",
+  "/editorial/issues/e70b5ec4-08e5-4810-98ea-9b0964112e59/edit",
   "/admin/roles",
   "/admin/statistics",
   "/admin/audit-log",
@@ -259,25 +278,42 @@ function audit(path, html) {
   return findings;
 }
 
+const cookie = await auditCookie();
+if (!cookie) {
+  console.log(
+    "\nNo session - set AUDIT_EMAIL and AUDIT_PASSWORD in .env.local.\n" +
+      "Portal routes redirect to /login and are NOT being audited.\n",
+  );
+}
+
 let total = 0;
 const byKind = new Map();
+// Pages that never returned HTML. Counted separately because a page that was
+// not fetched was not audited, and folding it into the total would report a
+// clean sweep of pages nobody looked at — the dev server drops connections
+// part-way through a run under this many rapid renders, which is exactly when
+// that lie would be told.
+const unreachable = [];
 
 for (const path of PAGES) {
   let html;
   try {
-    // Sign in as a super administrator, the way a real reviewer of these
-    // pages would: without it every guarded route silently follows its
-    // redirect to /dashboard and the audit passes on the wrong HTML.
+    // A real signed-in session, because the portal routes are guarded and a
+    // signed-out request is redirected to /login. Without it the audit would
+    // grade the login page once per route and report a clean sweep of pages it
+    // never saw. See scripts/audit-session.mjs.
     const res = await fetch(base + path, {
-      headers: { cookie: "borjss_dev_role=superAdmin" },
+      headers: cookie ? { cookie } : {},
     });
     if (!res.ok) {
       console.log(`\n${path}\n  HTTP ${res.status}`);
+      unreachable.push(`${path} (HTTP ${res.status})`);
       continue;
     }
     html = await res.text();
   } catch (err) {
     console.log(`\n${path}\n  fetch failed: ${err.message}`);
+    unreachable.push(`${path} (fetch failed)`);
     continue;
   }
 
@@ -305,8 +341,25 @@ for (const path of PAGES) {
 }
 
 console.log(`\n${"=".repeat(60)}`);
-console.log(`${total} finding(s) across ${PAGES.length} pages`);
+// The denominator is pages actually audited, never the list length. Reporting
+// "0 findings across 96 pages" when 14 of them never loaded is the kind of
+// quietly-wrong number that stops anyone believing the rest of the run.
+const audited = PAGES.length - unreachable.length;
+console.log(`${total} finding(s) across ${audited} of ${PAGES.length} pages`);
 for (const [kind, n] of [...byKind].sort((a, b) => b[1] - a[1])) {
   console.log(`  ${String(n).padStart(3)}  ${kind}`);
 }
-process.exit(0);
+
+if (unreachable.length > 0) {
+  console.log(
+    `\n${unreachable.length} page(s) were NOT audited — this run is incomplete:`,
+  );
+  for (const p of unreachable) console.log(`  ${p}`);
+  console.log(
+    "\nRestart the dev server and run again before trusting the number above.",
+  );
+}
+
+// Non-zero on findings *or* on an incomplete run, so a failed sweep cannot pass
+// for a clean one in a script or a CI step.
+process.exit(total > 0 || unreachable.length > 0 ? 1 : 0);

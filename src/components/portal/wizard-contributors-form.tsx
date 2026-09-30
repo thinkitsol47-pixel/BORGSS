@@ -28,10 +28,40 @@ const MAX_AUTHORS = 15;
  * contribution, so the list has explicit move controls rather than sorting
  * itself.
  */
-export function WizardContributorsForm({ draftId }: { draftId: string }) {
+/** One stored author row, as the loader returns it. */
+export type SavedContributor = {
+  givenName: string;
+  familyName: string;
+  email: string;
+  affiliation: string;
+  orcid: string;
+  isCorresponding: boolean;
+};
+
+export function WizardContributorsForm({
+  draftId,
+  saved,
+}: {
+  draftId: string;
+  saved?: SavedContributor[];
+}) {
   const [state, formAction] = useFormState(saveContributors, initialState);
-  const [rows, setRows] = useState<number[]>([0]);
-  const [corresponding, setCorresponding] = useState(0);
+
+  /**
+   * One row per stored author, or a single blank row for a new draft.
+   *
+   * The row ids are indices into `saved`, which is what lets each field below
+   * find its own stored value — the form posts `givenName-0`, `givenName-1`
+   * and so on, so the id *is* the position. Reordering swaps ids, and the
+   * action rewrites the list wholesale on save, so a moved row keeps its
+   * values.
+   */
+  const initialRows = saved && saved.length > 0 ? saved.map((_, i) => i) : [0];
+  const [rows, setRows] = useState<number[]>(initialRows);
+  const [corresponding, setCorresponding] = useState(() => {
+    const i = saved?.findIndex((c) => c.isCorresponding) ?? -1;
+    return i >= 0 ? i : 0;
+  });
 
   if (state.status === "success") {
     return (
@@ -67,6 +97,10 @@ export function WizardContributorsForm({ draftId }: { draftId: string }) {
 
   return (
     <form action={formAction} className="space-y-6" noValidate>
+      {/* The draft these answers belong to. The action re-checks that this
+          user owns it rather than trusting the value. */}
+      <input type="hidden" name="draftId" value={draftId} />
+
       {state.status === "error" && state.message && (
         <Alert tone="danger" title="Could not continue">
           {state.message}
@@ -148,7 +182,9 @@ export function WizardContributorsForm({ draftId }: { draftId: string }) {
                 >
                   <Input
                     name={`givenName-${id}`}
-                    defaultValue={v[`givenName-${id}`]}
+                    defaultValue={
+                      v[`givenName-${id}`] ?? saved?.[id]?.givenName ?? ""
+                    }
                   />
                 </Field>
                 <Field
@@ -159,7 +195,9 @@ export function WizardContributorsForm({ draftId }: { draftId: string }) {
                 >
                   <Input
                     name={`familyName-${id}`}
-                    defaultValue={v[`familyName-${id}`]}
+                    defaultValue={
+                      v[`familyName-${id}`] ?? saved?.[id]?.familyName ?? ""
+                    }
                   />
                 </Field>
               </div>
@@ -175,7 +213,7 @@ export function WizardContributorsForm({ draftId }: { draftId: string }) {
                   <Input
                     name={`email-${id}`}
                     type="email"
-                    defaultValue={v[`email-${id}`]}
+                    defaultValue={v[`email-${id}`] ?? saved?.[id]?.email ?? ""}
                   />
                 </Field>
               </div>
@@ -190,7 +228,9 @@ export function WizardContributorsForm({ draftId }: { draftId: string }) {
                 >
                   <Input
                     name={`affiliation-${id}`}
-                    defaultValue={v[`affiliation-${id}`]}
+                    defaultValue={
+                      v[`affiliation-${id}`] ?? saved?.[id]?.affiliation ?? ""
+                    }
                   />
                 </Field>
               </div>
@@ -205,7 +245,7 @@ export function WizardContributorsForm({ draftId }: { draftId: string }) {
                 >
                   <Input
                     name={`orcid-${id}`}
-                    defaultValue={v[`orcid-${id}`]}
+                    defaultValue={v[`orcid-${id}`] ?? saved?.[id]?.orcid ?? ""}
                     inputMode="numeric"
                   />
                 </Field>

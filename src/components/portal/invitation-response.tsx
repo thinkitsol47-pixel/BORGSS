@@ -20,7 +20,13 @@ const initialState: ReviewActionState = { status: "idle" };
  * making it compulsory just produces empty ones, and slows down the honest
  * "no time" that editors most need to hear quickly.
  */
-export function InvitationResponse({ dueAt }: { dueAt?: string }) {
+export function InvitationResponse({
+  reviewId,
+  dueAt,
+}: {
+  reviewId: string;
+  dueAt?: string;
+}) {
   const [state, formAction] = useFormState(respondToInvitation, initialState);
   const [choice, setChoice] = useState<"accept" | "decline" | null>(null);
 
@@ -69,6 +75,7 @@ export function InvitationResponse({ dueAt }: { dueAt?: string }) {
       <form action={formAction} className="mt-4">
         {/* The chosen answer travels as a hidden field, so the two buttons
             below are a choice rather than two separate submits. */}
+        <input type="hidden" name="reviewId" value={reviewId} />
         <input type="hidden" name="response" value={choice ?? ""} />
 
         {choice !== "decline" ? (

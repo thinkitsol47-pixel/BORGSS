@@ -28,7 +28,6 @@ export default function Page() {
       title="Open Access Policy"
       lead="Every article this journal publishes is free to read, download and reuse from the day it appears. There is no subscription, no paywall and no embargo."
       toc={TOC}
-      updated="2026-01-15"
       related={["licensing", "copyright", "editorial-independence"]}
     >
       <h2 id="statement">Open access statement</h2>

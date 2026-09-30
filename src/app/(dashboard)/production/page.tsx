@@ -248,14 +248,11 @@ export default async function Page({
         </>
       )}
 
-      <div className="mt-8">
-        <Alert tone="warning" title="Production is not built yet">
-          Nothing here can be changed: no stage can be advanced or assigned, no
-          galley uploaded, and no correction marked applied. There is no
-          database and no file storage. These screens read the current state;
-          production is coordinated by email in the meantime.
-        </Alert>
-      </div>
+      {/* The inventory of what saves has gone: it listed the screen's ordinary
+          behaviour, and a notice that repeats what the buttons already do is
+          how a reader learns to skip the ones that matter. The email limit is
+          stated on each stage screen, where someone is actually about to send
+          something. */}
     </PortalPage>
   );
 }

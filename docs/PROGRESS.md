@@ -1,17 +1,26 @@
 # BORJSS — build progress
 
-**Last updated:** 2026-09-04
-**Status: the frontend is complete.** All 92 routes are built, no stubs
-remain, and **step 22 (final polish) is done**. `/kitchen-sink` has been
-deleted, which is why the count is 92 rather than 93.
+**Last updated:** 2026-09-16
+**Status: the frontend is complete; the backend is nearly so.** All 92 routes
+are built, no stubs remain, and **step 22 (final polish) is done**.
+`/kitchen-sink` has been deleted, which is why the count is 92 rather than 93.
 
 Standing checks, all green: `npm run typecheck`, `next lint`, a production
-build (98 static pages), **0 findings** from both the responsive audit and the
-new accessibility audit across 87 pages, and both schema suites (19 + 37).
+build, **0 findings** from both the responsive audit and the accessibility
+audit across 96 pages, and both schema suites (19 + 37).
 
-What remains is **the backend**. Nothing on this platform stores, sends or
-authenticates anything — see "What the backend has to do" at the end of this
-file.
+**Backend: phases 1 – 5 done; 6 blocked on a domain, and 7 behind it.**
+Issue planning was the last unbuilt feature, and it landed 2026-09-16.
+
+| Phase | State |
+|---|---|
+| 1 — Foundation | ✅ Supabase Postgres, 34 tables, seeded, RLS on all of them |
+| 2 — Auth | ✅ Supabase Auth. The demo door is deleted; one account can sign in |
+| 3 — Reading | ✅ All six portal readers query the database. **The public site is a separate count** — see `docs/PUBLIC-SITE-WIRING.md` |
+| 4 — Writing | ✅ Every portal write persists — production, corrections and **issue planning** |
+| 5 — File storage | ✅ Cloudinary. Submissions, **revisions** and **production galleys** |
+| 6 — Email | 🟡 Resend connected, but **no domain**, so it reaches one address only |
+| 7 — Scheduled work | ❌ Reminders and Crossref deposit. Both wait on phase 6 |
 
 Counted from the source, not estimated: `find src/app -name page.tsx` gives the
 route total and `grep -rl Placeholder src/app --include=page.tsx` the stub
@@ -32,6 +41,118 @@ exists twice on purpose — `/for-authors/how-to-submit` for public visitors and
 
 > New session? Read this file and `CLAUDE.md`, then continue from
 > **"Where to pick up"** at the bottom.
+
+---
+
+## ► NEXT (as of 2026-09-16)
+
+**Everything below "Backend progress" is the detail. This is the short answer.**
+
+### 0. Resume the production walkthrough at Typesetting — the one task in flight
+
+`BORJSS-2026-0079` is mid-walkthrough and is the **first manuscript ever to
+reach production through the app** rather than through the seed. State as of
+the last session:
+
+| Stage | State |
+|---|---|
+| Copyediting | ✅ done — assigned to Hina Aslam, sent to author, approved |
+| Typesetting | ⬜ not started — **resume here** |
+| Proofreading | ⬜ not started |
+
+**The next actions, in order.** Open `/production` → *Digital Payment Adoption
+Among Small Retailers* → **Typesetting** tab:
+
+1. **Assign and start** → Faisal Nadeem (layoutEditor) → *Start stage*
+2. **Upload galley** → format PDF → any real PDF → *Upload*
+3. **Download it back.** This is the actual test: a galley uploaded through the
+   app lands under `submissions/<id>/galleys`, which `isStoredFile()` accepts,
+   so the row renders a working **Download** link. The four seeded galleys all
+   carry `mock/production/...` paths and correctly render "Uploaded before file
+   storage existed" — **that is not a bug**, and it is why the upload has to
+   come first for there to be anything to download.
+4. **Mark final** → the green *Final* badge
+5. **Proofreading** tab → *Add a correction*, then *Mark applied* on one and
+   *Decline with a reason* on another. Check the reason box refuses an empty
+   submit.
+6. Complete all three stages → `/editorial/issues` to place it in an issue
+
+**Issue planning is built** (item 4 below), so step 6 now lands on a screen
+that saves. The client's original order put production first so the issue
+screen would have something real to place; the seeded accepted manuscripts
+served that purpose, and the placement round was exercised against them.
+
+### 1. Buy a domain — the only thing blocking a launch, and not a code task
+
+Resend is connected and six templates are written, but **the journal owns no
+domain**, so Resend delivers only to the account owner's own address
+(`ceoborjss@gmail.com`) and refuses everything else with a 403. That means:
+
+- an author who submits gets no receipt
+- a reviewer who is invited is never told
+- a forgotten password cannot be recovered
+
+Buy one (`.org`, ~$12/year), verify it at resend.com/domains, set `EMAIL_FROM`
+to an address on it. **No code changes.** Then two things follow immediately:
+
+- set `email_confirm` back to `false` in `register` (`(auth)/actions.ts`) and
+  point `resendVerification` at `supabase.auth.resend()` — the TODO is there
+- open `/for-authors/how-to-submit` to the portal instead of email, which is
+  the one-line change described in the stale-notice sweep below
+
+### 2. ~~Galley uploads, proof corrections, revision uploads~~ — all done 2026-09-14
+
+**Every piece of building that did not need a domain is finished.** Galley
+upload and download, all five production stage transitions, proof corrections
+(with their migration), and the author's revision upload round. See "Phase 4/5
+— production" and "Phase 5 — revision uploads" below.
+
+What remains is **not code**: a domain (which unblocks all email and phase 7),
+a Crossref prefix, an ISSN and an e-ISSN.
+
+### 3. ~~The `/admin/users` role screen~~ — done 2026-09-09
+
+Roles and account status now save. See "Phase 4 — the `/admin/users` role
+screen" below. What is still not possible from that screen is **creating** an
+account, which waits on a domain like everything else email-shaped.
+
+### 4. ~~Issue planning~~ — built 2026-09-16
+
+Creating and editing an issue, placing an accepted manuscript into one,
+reordering and removing all persist. No migration was needed: `EditorialIssue`
+and `IssuePlanItem` were already there with RLS on, so this was
+actions-and-forms work, as recorded. See "Phase 4 — issue planning" below for
+what it had to reconcile.
+
+**Publishing an issue stays blocked**, and now has no code path at all rather
+than a disabled control: `issueSchema` does not accept `published`, so the form
+cannot reach the state. It mints DOIs and there is no Crossref prefix.
+
+### Not code, and needed before a DOAJ application
+
+A **Crossref prefix** (every DOI in the app is `10.xxxxx` and resolves
+nowhere), an **ISSN** and an **e-ISSN**. `/admin/settings/journal` now saves all
+three the moment they exist.
+
+**Known annoyances**, documented below in full:
+
+- The dev server crashes part-way through the structural audits (connection
+  pressure, ~96 rapid renders). **Both were re-run on 2026-09-16 after issue
+  planning landed: 0 findings across 96 of 96 pages each.** The crash is real
+  and it bit again — the a11y run reported two dozen `fetch failed` pages
+  against a server the responsive run had just finished with, and passed
+  cleanly on a fresh one. Run each against a freshly started suffixed server,
+  and check the "96 of 96" count, not only the finding count.
+- `/production/[submissionId]/copyedit` still says "Downloads are not wired
+  into this screen yet". Downloads *are* wired everywhere else; the correct
+  statement is the one the editorial overview uses — a file with no link is one
+  recorded before storage existed. Harmless today only because every seeded
+  manuscript's files are `mock/...` paths with nothing behind them.
+- **`prisma/db:seed` will undo the 2026-09-16 data repairs** if the drifted
+  fixtures are reseeded — the *fixtures* still carry "Public Policy" and
+  "Psychology". `resolveSectionName()` now maps and rejects these, so a reseed
+  is safe, but `mock-reviewers.ts` itself is still wrong and should be
+  corrected at source.
 
 ---
 
@@ -1103,10 +1224,15 @@ computed from the date, a stated 24-month interval, and a five-step checklist
 for changing one — which begins with "check what else says it", because
 licensing, copyright, open access and the APC page all state the same facts.
 
-**One duplication is called out rather than hidden:** the review date lives in
-each policy page as `updated=` *and* again on this screen. Moving it onto the
-`POLICIES` array as a `reviewedAt` field would remove it and allow genuinely
-per-policy dates — worth doing the next time a policy is actually revised.
+**The one duplication this screen used to carry is gone (2026-09-14).** The
+review date lived in each policy page as `updated=` *and* again as a constant
+on this screen, so a policy revised in its own file left the settings screen
+reporting the old date. It is now a `reviewedAt` field on the `POLICIES` array
+and nowhere else: `PolicyPage` takes no `updated` prop at all and reads
+`policyReviewedAt(slug)` instead, which is what made the typechecker find every
+page still passing one. The screen shows per-policy dates and takes its
+headline figure from the *oldest* policy — an average would hide the single
+forgotten policy the figure exists to surface.
 
 Supporting work: `settings-page.tsx` (`SettingsPage`, `SETTINGS_TABS`,
 `SettingRow`, `SourceNote`) in `src/components/layout/`.
@@ -1200,71 +1326,1838 @@ its redirect deliberately commented out. They needed checking, not creating.
 
 ---
 
+## Backend progress
+
+Follows `docs/BACKEND-PLAN.md`'s phases. This section is the log of what has
+actually landed; BACKEND-PLAN.md stays the design document and is not
+rewritten as work completes.
+
+### Moved to Supabase ✅ (2026-09-08)
+
+Development ran against a local PostgreSQL 18 while there was no Supabase
+account. There is one now, and the database is on it: **PostgreSQL 17.6 in
+`ap-southeast-2` (Sydney)**, all four migrations applied with
+`prisma migrate deploy`, and seeded. Verified by reading back through the
+pooler — 39 users, 18 submissions, 10 sections, 20 review assignments, 7
+reports, 7 articles, 10 posts, 2 issues, 8 audit entries — and by loading the
+site against it: the public pages, `/admin/users` and `/editorial/queue` all
+render real rows. The "Gender & Development" fix survived the move.
+
+It was, as predicted, a two-line env change — `DATABASE_URL` and `DIRECT_URL`
+in `.env.local`. **One thing did need a code change**, and it will bite anyone
+seeding a remote database again:
+
+> `prisma/seed.ts` wraps ~1000 inserts in one transaction and passed only
+> `{ timeout: 60_000 }`. Against Supabase it failed with **"Unable to start a
+> transaction in the given time" (P2028)** — note *start*, not finish: that is
+> `maxWait`, which defaults to 2 seconds and is the time Prisma waits to
+> *acquire* a connection. Fine on localhost, not fine to Sydney. Now
+> `{ maxWait: 60_000, timeout: 240_000 }`.
+
+The local database still exists and both old connection strings are commented in
+`.env.local`, so falling back is a two-line edit if Supabase is ever
+unreachable mid-session. **Switch both or neither** — a Supabase `DATABASE_URL`
+beside a local `DIRECT_URL` would read one database and migrate the other.
+
+**Still not done:** Supabase *Auth*. This is the database move only —
+`getCurrentUser()` still returns a demo identity and nothing checks a password.
+
+### Phase 1 — Foundation ✅ (originally on local Postgres)
+
+No Supabase account exists yet. Development runs against a **local
+PostgreSQL 18** instance instead — `prisma.config.ts` and `src/lib/db.ts` read
+`DATABASE_URL`/`DIRECT_URL` from `.env.local` exactly as they would a Supabase
+connection string, so moving to Supabase later is a two-line env change, not a
+code change.
+
+- `prisma/schema.prisma` (843 lines, ~27 models) migrated: `npx prisma migrate
+  dev` created 28 tables in the local `borjss` database.
+- Both schema decisions from BACKEND-PLAN.md are in the schema and confirmed
+  live in the seeded data: `Section` is a registry table (`Submission.sectionId`
+  is a foreign key), and `ReviewForm` is versioned (every seeded
+  `ReviewerReport` points at `ReviewForm` v1).
+- `prisma/seed.ts` (~1000 lines) loads every `src/lib/api/mock-*.ts` fixture
+  into the database, mapping each short mock id (`"s1"`, `"u4"`, ...) to a
+  deterministic UUID so re-seeding is idempotent. Both known data defects were
+  fixed on the way in: "Gender Studies" now resolves to "Gender & Development",
+  and the ten canonical sections come from `/about/aims-scope`, not the
+  fixtures.
+- One seeding gap found and fixed after the fact: `mock-reviews.ts` (the fixed
+  user's own review tasks, `rv1`–`rv4`) was never imported into `seed.ts`, so
+  `/reviews` had no data even after phase 1 "completed". Added as its own step
+  in `seed.ts` — four synthetic submissions, `u4` as sole reviewer, and the
+  one returned report.
+- **Verified directly against the database with `psql`, not by trusting a
+  report** — row counts for every major table, the section list, and the
+  fixed Gender & Development drift were all checked by query, not assumed.
+
+### Phase 2 — Auth: only the identity swap done, not auth itself
+
+`getCurrentUser()` (`src/lib/auth/current-user.ts`) now reads the current
+user's row from the database (keyed by the same email each demo identity
+always used) instead of returning a hardcoded object. **This is not
+authentication** — the demo-role cookie system, `isDemoMode()`, and the
+credential-free sign-in on `/login` are all unchanged. Nothing checks a
+password or sets a real session. The rest of phase 2 (Supabase Auth, the
+`middleware.ts` redirect, deleting the demo door) has not started.
+
+### Phase 3 — Reading: complete, 6 of 6 files done
+
+| File | Status |
+|---|---|
+| `submissions.ts` | ✅ Rewired — author's own list, detail, revisions, messages, decisions |
+| `reviews.ts` | ✅ Rewired — reviewer's own tasks, double-blind preserved |
+| `editorial.ts` | ✅ Rewired — queue, waiting-on logic, reviewer directory, decisions, issues, DOI register |
+| `production.ts` | ✅ Rewired — production queue, stage/waiting-on logic, stage screens, galleys, proof corrections |
+| `admin.ts` | ✅ Rewired — account directory, roles matrix counts, audit log, journal statistics, turnaround |
+
+**This phase covered the portal only, and that distinction was never written
+down until 2026-09-16.** All 52 portal pages read Postgres; nine *public* pages
+were still on `src/lib/api/mock-data.ts`, which was harmless while nothing wrote
+articles or issues and stopped being harmless the moment issue planning landed —
+an editor could assemble an issue the public archive could never show.
+
+**All nine were wired the same day**, in the three stages
+`docs/PUBLIC-SITE-WIRING.md` records: issues and board members first (no
+migration), then `20260916120000_article_contributors` to give a published
+article its own byline, then the articles themselves. **No page under `src/`
+imports a fixture any more** — `mock-*.ts` is read only by `prisma/seed.ts`.
+
+Two things that only showed up in the doing, both recorded in full in that file:
+the seed had never written `BoardMember.sortOrder`, so ordering by it would have
+returned the board in any order at all; and a `publishedAt <= now` filter on
+articles had to be taken back out, because the seeded Vol. 1 No. 2 carries a
+cover date of 2026-12-31 and the filter emptied its table of contents while the
+issue went on being listed.
+
+Each rewired file was verified the same way: `npm run typecheck`, a suffixed
+dev server (`BORJSS_DIST_SUFFIX=check`, port 3100, never the unsuffixed
+server) hit with real routes and checked for real database content (not just
+a 200), `next lint`, and — after `editorial.ts` and again after
+`production.ts` — both structural audits re-run against the full site
+(0 findings across 94 pages, both).
+
+**`production.ts` — what the rewrite had to reconcile.** The pure functions
+(`currentStage`, `productionWaitingOn`, `stalledDays`, `sortJobs`, the queue
+filter) were left untouched — they operate on an already-mapped
+`ProductionJob` and the mapper feeds them the same shape the mock data did.
+Only the loaders changed, and three mismatches between the mock `ProductionJob`
+and the schema had to be bridged in the mapper:
+
+1. **The manuscript is loaded through `editorial.ts`.** `getProductionSubmission`
+   now delegates to `getEditorialSubmissionById`, so a production screen renders
+   the identical `Submission` the editorial and author screens do — same
+   double-blind mapping, same section-registry fix — rather than a second
+   mapper that could drift.
+2. **`ProductionGalley` has no `label` or `filename` column.** The schema keeps
+   `storagePath`, `format`, `version`, `isFinal`; the type wants a label and a
+   filename. Label is derived from `format` (the stage screens carry their own
+   `FORMAT_LABEL` anyway, so this only has to be present), and the filename is
+   recovered as the basename of `storagePath` — which the seed built from the
+   filename, so the round-trip is exact.
+3. **`ProofCorrection` is stored flatter than the type.** The `description`
+   column holds `"{location}: {rest}"` (seed's doing) and is split back apart;
+   one `applied` boolean plus an optional `declinedReason` becomes the
+   three-value `state` (`applied` / `rejected` / `open`); `resolution` is
+   `declinedReason`. `raisedBy` is **not stored** — it defaults to `"author"`,
+   the common case and the only value the screen distinguishes for tone. When
+   the write path lands (phase 4) the column should be added rather than left
+   guessed.
+
+`daysSince` (exported, used by `stalledDays`) and `targetDate` are the other
+denormalisation: the mock job carried `reference`, `title` and `targetDate`
+inline; the schema puts `reference`/`title` on `Submission` and `targetDate`
+on `EditorialIssue`, all joined in by the mapper.
+
+**Audit script fix, same as the editorial one.** `scripts/responsive-audit.mjs`
+had the four production routes hard-coded to pre-database mock ids (`s5`, `p1`,
+`p3`) — now non-UUIDs, so `production.ts` 404s them and the audit was silently
+skipping them. Re-derived each as a real seeded submission id with the matching
+state (proofreading with open corrections; a stage with the author; nothing
+started) and swapped them in, with a comment on how to re-derive after a
+reseed. `a11y-audit.mjs` reads its list from the responsive audit, so it needed
+no change.
+
+**Two defects found and fixed while rewiring, both real:**
+
+1. **Prisma's generated enums are camelCase; `src/types` is kebab-case.**
+   `@map("kebab-case")` in the schema only renames the database column, not
+   the TypeScript enum the client generates (`deskReview`, not
+   `"desk-review"`). Every rewired file now converts both directions with a
+   small `camelToKebab`/`kebabToCamel` helper — silently trusting one string
+   union for the other would have been a runtime bug typecheck could not
+   catch on its own (the two happen to overlap for several enum values,
+   which is what let it pass a first pass unnoticed).
+2. **A non-UUID id crashed the page instead of 404ing.** Every id column is
+   `@db.Uuid`, but old mock ids (`"s1"`, `"rv4"`) are still reachable from
+   browser history and hard-coded links written before this phase. Passing one
+   straight to `findUnique` threw a Postgres syntax error instead of returning
+   `null`. Fixed with `isUuid()` in `src/lib/db.ts`, checked before every
+   lookup-by-id — confirmed old ids now 404 cleanly and real ids still 200.
+
+**A related fix in the test tooling:** `scripts/responsive-audit.mjs` had four
+routes hard-coded to pre-database mock ids (`q2`, `q3`, `s5`'s editorial
+routes, `ei3`) chosen to exercise specific fixture states (an overdue
+reviewer, disagreeing reviewers, an in-production manuscript, a still-planned
+issue). Re-derived each as a real database id with the matching state via
+`psql` and swapped them in, with a comment on how to re-derive them again
+after a reseed. `scripts/a11y-audit.mjs` needed no change — it reads its page
+list from the responsive audit.
+
+**Operational note for whoever runs the audits next:** running both
+structural audits back-to-back against the local dev server hung it twice
+(Postgres connection pressure from 94 pages fetched in quick succession, most
+likely) — each time recovered by killing the process and restarting with a
+clean `.next-build-check`. Give the server a few seconds between the two
+audits rather than chaining them immediately.
+
+**`admin.ts` — the last reader, rewired.** Same pattern as the four before it:
+signatures unchanged, `isUuid()` before every lookup-by-id, `camelToKebab` for
+the one enum that needs it (`ArticleType`, in the statistics breakdown —
+`Role` and `AccountStatus` carry no `@map()` so they pass through). What the
+rewrite had to reconcile:
+
+1. **`roleHolderCounts()` and `auditActions()` had to become `async`.** They
+   were synchronous helpers reading a mock array; a database query is not. Both
+   call sites (`/admin/roles`, `/admin/audit-log`) are already `async`
+   components and now `await` them. No other signature changed.
+2. **The audit log's `target` was being dropped on seed.** `mock-users.ts`
+   names each entry's target as a human label ("BORJSS-2026-0068",
+   "Dr. Ayesha Khan"), but `seed.ts` was writing `targetId: null` and only
+   keeping `detail`. `AuditEntry.targetType`/`targetId` in the schema expect a
+   typed reference the mock data does not have. Fixed by storing the label in
+   `targetId` and mapping it back in `toAuditEntry` — the seed was re-run.
+   When the write path lands, audit entries should carry a real `targetType` +
+   UUID `targetId` and this mapping can tighten.
+3. **`/admin/users` now lists every seeded account, ~39 of them.** The mock
+   directory was 14 hand-written accounts; the seed also creates an account for
+   every reviewer in `mock-reviewers.ts` and a synthetic `author-N` account for
+   every `submittedById` in the queue/production fixtures. Some of those have
+   placeholder names ("Corresponding Author (withheld)") and there are a couple
+   of near-duplicates. This matches how `editorial.ts` shows every seeded
+   submission rather than a curated subset — it is real data, not a fixture
+   list — but the synthetic accounts could be given better names in `seed.ts`
+   if the screen needs to look tidier.
+
+**Audit-script fix, as with editorial and production.**
+`scripts/responsive-audit.mjs` had `/admin/users/u1` and `/admin/users/u1/edit`
+hard-coded — now non-UUIDs, so `admin.ts` 404s them and the audit was skipping
+them. Swapped in the real seeded UUID for mock id `u1` (Dr. Mubashir Quddus, a
+multi-role account), with a comment on re-deriving it. `a11y-audit.mjs` reads
+its list from the responsive audit, so it needed no change.
+
+**Verified:** `npm run typecheck`, `next lint`, a suffixed dev server on port
+3100 with `/admin/users`, `/admin/roles`, `/admin/audit-log` and
+`/admin/statistics` all showing real database content (a non-UUID id 404s
+cleanly; the `admin` role still 307s away from `/admin/audit-log`), and both
+structural audits re-run — **0 findings across 94 pages, both.**
+
+### Phase 4 — Writing: started with the two public forms
+
+The two forms a signed-out visitor can submit now persist. Everything else
+(the wizard, reviews, editorial, profile, admin CRUD, auth) still
+validates-and-returns.
+
+| Form | Action | Lands in |
+|---|---|---|
+| `/contact` | `submitContact` | `ContactMessage` (`handledAt` null until worked) |
+| `/for-reviewers/become-a-reviewer` | `submitReviewerApplication` | `ReviewerApplication` (`status` = `pending`) |
+
+**Schema.** Two new models plus their enums, added at the end of
+`schema.prisma` under a `PUBLIC FORMS` heading; migration
+`20260907083643_public_form_submissions`. Nothing existing was touched. Design
+notes on the models:
+
+- `ContactTopic` mirrors `CONTACT_TOPICS` in `schemas.ts` exactly (`submission`,
+  `review`, `editorial`, `technical`, `charges`, `permissions`, `other`).
+- `ReviewerApplicationDegree` needs the kebab→camel map (`doctoral-candidate` →
+  `doctoralCandidate`); the action carries a small `DEGREE` lookup for it. The
+  other three values are identical in both.
+- `ReviewerApplication` is deliberately **not** a `ReviewerProfile` and **not**
+  a `User` — it is the raw application, worked by hand, and becomes a profile
+  only if accepted. That accept-flow is not built; applications sit at
+  `pending`.
+
+**What is still missing for these two forms** (both known, both out of scope
+here):
+
+1. **No email.** Neither the sender's confirmation nor the office's
+   notification is sent — there is no mail provider (Phase 6). The on-screen
+   notices on both pages still say the message is not delivered, and stay until
+   that is true. There is also no in-portal *reply* — the office reads the
+   address on each row and replies from its own mailbox.
+
+### Phase 4 — the two admin queues for those forms
+
+Built straight after, so the rows the public forms write have somewhere to be
+read and worked:
+
+| Screen | Reads | Actions |
+|---|---|---|
+| `/admin/messages` | `ContactMessage` | Mark handled / reopen (sets `handledAt`) |
+| `/admin/reviewer-applications` | `ReviewerApplication` | Accept / decline / reopen (sets `status`) |
+
+- **Guard:** `requireGroup("adminOnly")` on the page (superAdmin + admin +
+  journalManager) and again in every action — a Server Action is its own entry
+  point, the `recordDecision` pattern. Nav entries gate on `users.manage`, the
+  same permission, so the two lists appear for exactly that set.
+- **`src/lib/api/inbox.ts`** — the read side: list + filter + counts for both,
+  plus `contactMessageExists` / `reviewerApplicationExists` for the actions to
+  guard on. No enum conversion needed — `ContactTopic` and the
+  reviewer-application enums carry no `@map()`.
+- **`src/lib/api/audit.ts` — `recordAudit()`, the first real writer of
+  `AuditEntry`.** Every one of these four actions writes an entry
+  (`message.handled`, `reviewer-application.accepted`, …). `actorId` is stored
+  only when `getCurrentUser()` returns a real UUID — the mock fallback id
+  (`"mock-user"`) would violate the `@db.Uuid` column, so those rows keep just
+  `actorName`. Verified end-to-end: a POST to each action updated the row *and*
+  left an audit entry naming the acting demo identity.
+- **Accept does not create an account.** Turning an accepted application into a
+  `ReviewerProfile` + `User` needs the accounts system, which is not built, so
+  Accept sets `status` and nothing more — the screen says so in an alert rather
+  than implying a profile now exists.
+- **Responsive audit list** gained both routes; one real finding fixed —
+  `/admin/messages`'s three-up stat row did not collapse on a small phone, now
+  `grid-cols-1 xs:grid-cols-3`. Both structural audits: **0 findings across 96
+  pages.**
+
+**Still no email** — see point 1 above. Both screens tell the reader to reply
+from their own mailbox.
+
+**Honeypot and validation unchanged.** A filled `website` field still reports
+success and writes nothing; a failed Zod parse still echoes the form back
+without persisting.
+
+**`/policies/privacy` was corrected.** It stated the contact and
+reviewer-application forms store nothing — three places (the "what this site
+does today" list and two rows of the collection table). All three now say the
+forms *are* stored for the editorial office but that no email is sent yet. The
+retention table already covered both ("Enquiries and correspondence — 2
+years", "Reviewer records — until you ask to be removed"), so it was left.
+
+**Verified:** `npm run typecheck`, `next lint`, a direct round-trip test
+against both tables (insert with the exact shape each action builds, enum
+mapping, defaults, array columns, delete), both form pages still 200, and both
+structural audits — **0 findings across 94 pages, both.**
+
+### Phase 4 — editorial actions (`(dashboard)/editorial/actions.ts`)
+
+The editor's decision and reviewer-assignment actions now write. No email from
+any of them — the decision letter, the reviewer invitation, and the
+"a decision was reached" notice all need a mail provider (Phase 6), so the
+screens say the message goes out from the office by hand and these actions
+only move the database.
+
+**Schema migration** `20260907114520_editorial_decision_and_withdrawn` — both
+additive, nothing existing touched:
+
+- `AssignmentStatus.withdrawn` — a pulled invitation is kept and greyed, not
+  deleted, so the next editor sees the reviewer was approached and released.
+  Chosen over a row delete because this schema keeps history everywhere
+  (append-only decisions, suspended-not-deleted accounts, versioned galleys).
+- `SubmissionDecision.internalNote` — `decisionSchema` already collected it and
+  there was nowhere to put it.
+
+**`recordDecision` — rewritten to persist.** One `db.$transaction`: create the
+`SubmissionDecision` (type via `kebabToCamel`, letter split into paragraphs on
+blank lines, `internalNote`), then move `Submission.status`
+(accept → `accepted`; minor/major → `revisionRequested` with `revisionDueAt`
+at +42 days and `round` incremented; reject → `rejected`; desk-reject →
+`deskRejected`). The status move and the decision row land together or not at
+all — a half-recorded decision would leave the queue lying about whose desk
+the manuscript is on. Re-guards server-side: `requireGroup("editorial")`,
+`decisionBlockedReason`, and `availableDecisions` (the form posts straight to
+the action). Writes an audit entry. The outcome screen changed from *Checked,
+but not recorded* to *Decision recorded* — but still leads with **the author
+has not been emailed** and gives the letter back to copy into that email.
+
+**`inviteReviewer` (new).** Creates a `ReviewAssignment` for the current
+round: `status = invited`, a `dueAt`, the editor's note, and a label that is
+the next free "Reviewer N" across the whole manuscript (never reused — a label
+in a year-old decision letter must still mean the same person). Guards: the
+reviewer is in the pool, not already assigned this round (a withdrawn one does
+not block), and does not share an affiliation with an author (the one conflict
+this can detect, same limit the matching screen states). Audit entry. No
+email — the panel says "send it by hand".
+
+**`withdrawAssignment` (new).** Moves an `invited`/`accepted` assignment to
+`withdrawn`. Refuses if a report has been returned — that stays on the record.
+Audit entry.
+
+**Supporting changes:**
+
+- `ReviewerProfile` gained `userId` (the `User` id a `ReviewAssignment` points
+  at; `ReviewerProfile.id` is the pool-entry id, not the account). Mapped in
+  `editorial.ts`; `mock-reviewers.ts` fills it from the mock id at export
+  since only `seed.ts` still reads that file.
+- `roundProgress`, `getDecisionContext`'s `missing` list, and
+  `getReviewerMatches`'s `alreadyAssigned` set all now exclude `withdrawn` —
+  it is neither a report the round waits on nor a reason not to re-invite.
+- `ReviewAssignment.status` in `src/types` and the reviewers page's
+  `ASSIGNMENT_TONE` map gained `withdrawn`.
+- `InviteReviewerButton` and `AssignmentActions` were `alert()` stubs; they are
+  now real `useFormState` forms.
+
+**Verified:** `npm run typecheck`, `next lint`, a DB simulation of all three
+actions (decision transaction + status move + round bump + `revisionDueAt`;
+invite label sequencing; withdraw; audit entries) with a full revert, and
+`recordDecision` end-to-end via a real HTTP POST — status moved
+`under-review` → `revision-requested`, round 1 → 2, `revisionDueAt` set, the
+decision row and its `internalNote` stored, and an audit entry
+`decision.recorded` written with the actor and a detail JSON. Both structural
+audits: **0 findings across 96 pages.**
+
+### Phase 4 — review actions (`(dashboard)/reviews/actions.ts`)
+
+The other half of the editorial work above: the editor invites, and this is the
+reviewer answering and reporting. No schema change was needed — `ReviewAssignment`
+and `ReviewerReport` already carried everything. No email from either action;
+the handling editor is told by the office, and the screens say so.
+
+**`respondToInvitation`** — accept or decline now persists. Sets the
+assignment's `status`, `respondedAt`, and on a decline the `declineReason`
+(asked for, never required — forcing an explanation only produces empty ones).
+Refuses an invitation that has already been answered, naming which. Audit entry.
+
+**`submitReview`** — one `db.$transaction`:
+
+1. Creates the `ReviewerReport` — scores as a `Record<criterion, 1..5>` JSON
+   built from `REVIEW_CRITERIA` so a criterion cannot be stored under a name the
+   form does not use; `recommendation` through `kebabToCamel`; both comment
+   fields split into paragraphs on blank lines, matching the `String[]` columns.
+2. Moves the assignment to `completed` with `completedAt`.
+3. **Closes the round when this was the last report.** If every assignment in
+   the round that is not `declined` or `withdrawn` now has a report, the
+   submission moves to `awaiting-decision` — but only from `under-review` or
+   `desk-review`, so it can never override a decision an editor has already
+   recorded. This is what puts the manuscript in the editor's column the moment
+   the last report lands, which is the whole point of the queue's "waiting on"
+   column.
+
+A half-written report that left the assignment `accepted` would keep the
+manuscript sitting in the reviewers' column forever, which is why all three are
+one transaction. Refuses a second report on the same assignment (a returned
+review cannot be edited), and refuses one on an assignment that was never
+accepted. Audit entry carrying the recommendation.
+
+**Ownership is checked in every action, and the read was fixed too.**
+`ownAssignment()` loads the assignment and compares `reviewerId` against the
+signed-in user — `requireUser()` on the page proves only that *someone* is
+signed in, not that this review is theirs, and a Server Action is its own entry
+point. The same hole existed on the read side: `getReviewTaskById` in
+`reviews.ts` looked up any assignment by id, so another reviewer's confidential
+manuscript was one guessed UUID away. It is now scoped to the current user —
+someone else's task is *not found*, not merely unlisted.
+
+**Verified end-to-end via real HTTP POSTs**, not just a DB simulation:
+
+- `respondToInvitation` — status `invited` → `accepted`, `respondedAt` set,
+  audit `review.accepted` written with the reference and label.
+- `submitReview` — assignment → `completed`, the report stored with all six
+  scores, `minorRevision`, three author paragraphs and one editor paragraph,
+  the active `ReviewForm` id and the right round; **and the submission moved
+  `under-review` → `awaiting-decision`** because it was the round's only
+  assignment.
+- **The loop closes:** the editor's `/editorial/[id]/decision` screen then
+  rendered that report's actual paragraphs, its recommendation and the reviewer
+  label — a report written through the reviewer's form reaching the editor who
+  has to decide on it. All test data was reverted afterwards.
+
+`npm run typecheck`, `next lint`, and both structural audits — **0 findings
+across 96 pages.**
+
+### Phase 4 — profile actions (`(dashboard)/profile/actions.ts`)
+
+The account's own details. All three actions act **only on the signed-in
+user's row** — none of these forms carries a user id, and none should: a
+profile action that took one would be an account takeover waiting to be tried.
+`requireUser()` is both the guard and the target.
+
+**Schema migration** `20260908052556_user_profile_and_notifications` — all
+additive, existing rows take the defaults:
+
+- `department`, `position`, `bio` on `User`. The form already collected all
+  three and there was nowhere to put them.
+- `bio` is deliberately **not** `ReviewerProfile.note`. That is an editor's
+  private assessment of a reviewer, written by someone else about them; this is
+  the account's own words. Merging them would let a reviewer read, and
+  eventually edit, an editor's notes on their own work.
+- Six `notify*` booleans rather than one JSON blob: each is a real named
+  setting worth documenting, and a typo in a JSON key would silently mean
+  "off" where a wrong column name is a compile error. Defaults match what the
+  page ships checked — on for anything tied to a deadline, off for anything
+  promotional.
+
+**`saveProfile`** persists name, affiliation (the form calls it "institution";
+the column is `affiliation`, which is what the reviewer directory uses),
+department, position, country and bio.
+
+**The email address is refused, not applied.** It is the login *and* the
+address every decision letter goes to, so changing it has to be confirmed from
+the new address first — and there is no mail provider to send that with.
+Applying it silently could lock someone out of their own account, so the action
+saves everything else and the message says the address was not changed and to
+ask the editorial office. Verified by posting a different address: the original
+row survived and no row appeared under the new address, while the other edits
+on the same submit still saved.
+
+**`saveOrcid`** stores or clears the iD — and still says what it is. Storing a
+typed string is not verification; the real flow signs the person in at
+orcid.org and gets the iD back from ORCID itself. The page's "records an iD; it
+does not verify one" notice stays.
+
+**`saveNotifications`** writes all six booleans. An unchecked checkbox posts
+nothing at all, so each is read explicitly as `=== "on"` — that is what makes
+"the user turned this off" and "the browser never sent it" resolve to the same
+thing, which is what the form intends. Verified by posting only two of the six
+and confirming the other four became `false` rather than being left alone.
+
+**Reads were wired too, not just writes.** `CurrentUser` gained the editable
+fields and the notification block, so `/profile` and `/profile/notifications`
+now prefill from the database instead of rendering empty inputs over stored
+values — the bug that would have made every visit look like an empty profile.
+
+**Three stale notices corrected.** Both forms' success alerts said *Not saved*;
+`/profile/notifications` claimed preferences are "off by default until you
+save" (four ship on) and that saving "stores nothing" (it now stores). The page
+now says the choices **are** saved but that no email is sent yet, so nothing
+switched on will arrive and nothing switched off was going to.
+
+**Verified:** `npm run typecheck`, `next lint`, all three actions end-to-end via
+real HTTP POSTs with the rows checked afterwards and everything reverted, the
+migration's defaults confirmed on an existing row, and the prefill confirmed by
+re-fetching `/profile` and seeing the saved values rendered. Responsive audit:
+**0 findings across 96 pages**, no fetch failures.
+
+**The a11y audit has not completed against these changes.** Two attempts both
+ended with the dev server dying part-way — the first reported `fetch failed` on
+`/dashboard` and `/profile` (so its "0 findings" covered 94 pages, not 96), and
+the second died before writing any output. This is the connection-pressure
+crash the operational note above already describes, not something specific to
+the profile work; warming the routes first did not prevent it. **Re-run
+`node scripts/a11y-audit.mjs` against a freshly started server before trusting
+the a11y number for this change.** The pages involved are three forms built
+from the same `Field`/`CheckOption`/`Alert` primitives as every other portal
+form that already passes, so a finding is unlikely — but unlikely is not
+checked, and it is recorded here rather than assumed.
+
+### Phase 4 — announcements, news and events (`/admin/announcements`)
+
+The first screen where the portal writes content the **public site** reads.
+Everything before this was internal — a decision, a report, a profile — so a
+stale cache was invisible. Here it is the front page, which is why every action
+revalidates the public list and detail path as well as the admin screen.
+
+No schema change: `Post` already had every column, including the flattened
+event fields and the `@@unique([kind, slug])` this depends on.
+
+**Reads first — `articles.ts` is now half rewired.** `getPosts`,
+`getPostBySlug` and `getPostSlugs` query Prisma; `getLatestAnnouncements`
+follows from `getPosts`. **Articles, issues and board members deliberately stay
+on fixtures** — they have their own tables and admin screens to come, and
+rewiring them here would be a separate change with a much wider blast radius
+across the public site. `mockPosts` is now read only by `prisma/seed.ts`, which
+is the correct remaining job for it.
+
+> **Superseded 2026-09-16.** The other half was wired the day issue planning
+> landed, and for exactly the reason this paragraph gives for the posts: an
+> editor could now assemble an issue that the public archive — reading a
+> separate copy — could never show. `articles.ts` imports no fixture at all now.
+> See `docs/PUBLIC-SITE-WIRING.md`.
+
+The post sort stays in JS rather than becoming an `ORDER BY`: an event orders
+by `eventStartsAt` when it has one and `publishedAt` when it does not, which is
+a choice between two columns per row.
+
+**`postSchema`** (new, in `schemas.ts`) validates what the one shared form
+collects for all three kinds, with the conditional rules the kind selector
+implies:
+
+- An event needs a start date and a location — "Online" is a location.
+- A category belongs to an announcement. Storing one on a news item would put
+  a "Call for papers" badge on a list that cannot filter it.
+- Dates that contradict each other each get their own message: an end before a
+  start, an expiry before publication, a registration deadline after the event
+  has begun.
+- The slug is validated, not generated. An editor who can see and edit it can
+  keep a link stable when a title is reworded, which is the whole reason a slug
+  is a separate field.
+
+**`createPost` / `updatePost` / `deletePost`** each re-guard with
+`requireGroup("adminOnly")` and write an audit entry. Both write paths share
+one `rowData()` builder so they cannot drift — an edit that wrote a field the
+create path did not would only be found by someone comparing two posts.
+
+Two details worth keeping:
+
+1. **Switching kind clears what belongs to the old kind.** A post moved from
+   event to news has its start date and location nulled; one moved off
+   announcement loses its category. Leaving them would make a news item sort
+   like an event and carry a badge nothing can filter.
+2. **An update revalidates both the old and the new public URL.** Changing a
+   slug or a kind moves the page; without revalidating where it *was*, the
+   previous URL keeps serving a cached copy of a post that no longer lives
+   there.
+
+**Deleted, not archived** — unlike an account or a decision. A post has no
+foreign key hanging off it and no record anyone is entitled to appeal against.
+The audit entry keeps the kind, slug and title of what was removed, which is
+the part that has to survive.
+
+**Four false notices removed.** The list, new and edit pages all said "there is
+no database" and that nothing saves. They now say these are live, and the edit
+page warns that changing the address or the list moves the URL and breaks every
+link already pointing at it — including any already emailed out.
+
+**Verified end-to-end through the real forms**, with the database returned to
+its seeded state afterwards:
+
+- **Create** → 303 redirect, row correct (body split to paragraphs, category
+  null on a news item, no event fields), audit entry — and it appeared on the
+  public `/news` list *and* rendered at its detail page, a slug that did not
+  exist at build time.
+- **Duplicate slug** → refused with the error on the field, nothing created.
+- **Edit** changing both kind and slug → category applied, no new row, **the
+  old public URL 404s and the new one returns 200**, proving the
+  both-URLs revalidation works.
+- **Delete** → row gone, count back to 10, audit entry retained.
+
+`npm run typecheck` and `next lint` are clean.
+
+**The structural audits did not complete against this change.** The dev server
+crashed part-way through the responsive run — the same connection-pressure
+failure described in the operational note above, which also cost the profile
+work its a11y run. Warming the routes first did not help. **Run both audits
+against a freshly started server before trusting their numbers for the
+announcements or profile changes.**
+
+The remaining Phase 4 work (the wizard's draft persistence, the admin settings
+screens, and auth) has not started.
+
+---
+
+### Row Level Security — enabled on all 31 tables ✅ (2026-09-08)
+
+Done immediately before starting auth, and it had to be: Supabase hands the
+browser a **publishable (anon) key**, and with RLS off that key can read every
+row through the auto-generated REST API — manuscripts under double-blind
+review, reviewer reports, contact messages. The dashboard was flagging all 31
+tables as `UNRESTRICTED`, which is what Advisor's 31 critical findings were.
+Auth is the change that first puts that key in a browser, so the door had to be
+shut before, not after.
+
+**RLS on, zero policies.** The app never reads through the anon key: every
+query goes through Prisma over the Postgres connection string, which
+authenticates as the table owner and is exempt from RLS. So enabling it closes
+the anon door completely and changes nothing about how the app reads. Writing
+per-table policies would have been work with no reader to serve. If a screen is
+ever built to query Supabase directly from the browser, that is the moment a
+policy gets written — deliberately, for that one table.
+
+`prisma/migrations/20260908120000_enable_rls/` does it in a `DO` block looping
+over `pg_tables`, so it covers what exists rather than a hand-typed list of 30
+model names that would drift. **A table added by a later migration is not
+covered** — new tables default to RLS off, so each new migration needs its own
+`ENABLE ROW LEVEL SECURITY`.
+
+Verified after applying: RLS on 31 of 31 public tables, and Prisma still reads
+normally (9 affiliations, 18 submissions, 39 users). `npm run typecheck` clean.
+
+### Phase 2 — Auth: done, on Supabase Auth ✅ (2026-09-09)
+
+**Signing in works, and the portal is closed to anyone who has not.** The
+middleware redirect is live, `getCurrentUser()` reads a verified session, and
+registration creates a real account.
+
+**Two stores, one id.** Supabase Auth holds the credentials and the session;
+this app's `User` table holds the name, roles, affiliation and notification
+settings the portal renders. `User.id` *is* the `auth.users` id — the phase 1
+decision that made this a join rather than a synchronisation problem.
+
+**Roles are read from the database on every call, never from the token.** A JWT
+minted before someone was made an editor would otherwise keep saying they are
+not one until it expired. This is why `getCurrentUser()` queries after
+`getUser()` rather than reading claims.
+
+**`getUser()`, never `getSession()`**, in both the middleware and
+`current-user.ts`. `getSession()` reads the cookie and believes it; `getUser()`
+verifies the token with Supabase. A cookie is attacker-controlled input, and
+this is the check that decides who reaches the editorial queue.
+
+**The middleware does a second job that is easy to lose.** Supabase access
+tokens are short-lived, and a Server Component may read a refreshed token but
+cannot write the cookie back — Next forbids setting cookies during a render. So
+the `getUser()` call in `middleware.ts` is what keeps a session alive; the
+`supabaseServer()` cookie setter swallows the write failure it gets from a
+render, deliberately, and lets the middleware persist it on the next request.
+
+**What landed:**
+
+| File | What it does now |
+|---|---|
+| `src/lib/auth/supabase.ts` | Three clients: the visitor's (`supabaseServer`), the service-role one (`supabaseAdmin`), and the key readers. The admin client is never given a request's cookies |
+| `src/lib/auth/current-user.ts` | Real session first; the demo path runs only when there is no session **and** `isDemoMode()` |
+| `src/middleware.ts` | Redirect live, session refreshed, demo door still honoured |
+| `src/app/(auth)/actions.ts` | Sign in, register, reset request, reset — all real |
+| `src/app/(auth)/auth/callback/route.ts` | **New.** Exchanges Supabase's one-time code for a session |
+| `src/app/logout/route.ts` | Revokes the Supabase session *and* clears the demo cookie |
+
+**The reset link could not point at `/reset-password`.** Supabase does not put a
+usable token in the email; it sends a one-time `code` that must be exchanged for
+a session server-side, because the exchange writes cookies. So the link goes to
+`/auth/callback`, which spends the code and redirects. The page's old `?token=`
+check is gone — **the session is the token now**, which is stricter: a page
+trusting `?token=` would show the form to anyone who typed one.
+
+**Registration confirms addresses on creation, and that is a temporary lie
+worth knowing about.** `email_confirm: true` is set because no mail provider is
+connected: leaving it false would create accounts that can never sign in, since
+the confirmation link would never arrive. **Set it back to `false` when Resend
+lands.** `resendVerification` says plainly that nothing is waiting on it rather
+than reporting a send that did not happen.
+
+**Registration cleans up after itself.** If the auth account is created and the
+profile insert then fails, the auth account is deleted — `getCurrentUser()`
+returns null for exactly that half-created state, so the visitor would
+authenticate straight into a redirect loop. Deleting it leaves the address free
+to register again.
+
+**One message for "no such account" and "wrong password".** Distinguishing them
+tells an attacker which addresses are registered — the same account-enumeration
+leak the reset flow was already written to avoid.
+
+**`safeNext()` guards the post-login redirect.** `next` arrives in the URL, so
+without it an emailed `/login?next=https://elsewhere.example` turns the
+journal's own sign-in page into an open redirect. Only in-app paths pass;
+protocol-relative `//host` is rejected too. `/auth/callback` repeats the check
+for its own `next`.
+
+**The scaffold notices were not simply deleted — they were made true.** Sign-in
+and password-reset lost theirs because both now work. Register kept one, saying
+the account is real but the address is unverified. Forgot-password kept one
+saying delivery is still being set up. Verify-email kept one saying nothing is
+waiting on it. Deleting all five would have been the indexing-page mistake: a
+page claiming a feature the code does not have.
+
+**The demo door is still open, deliberately.** It is the only way to walk the
+portal as roles nobody has a password for. `isDemoMode()` still guards it, and
+"The demo door" below lists what gets deleted when it goes.
+
+**Verified end to end**, against the live Supabase project:
+
+1. Account created through the admin API, profile row written — ✅
+2. Sign-in with the publishable key issues a token — ✅
+3. Wrong password rejected — ✅
+4. Profile joined by auth id, roles read back — ✅
+5. Anon key reading `Submission` — **blocked**, RLS holding — ✅
+6. Production build, demo closed: `/dashboard`, `/submissions`, `/reviews`,
+   `/editorial/queue`, `/admin/users`, `/profile` all **307 → `/login?next=…`** — ✅
+7. Same build, real session cookie: those routes **200**, and the dashboard
+   renders the signed-in account's own name — ✅
+8. Public pages (`/`, `/articles`, `/contact`, `/login`, `/register`) stay 200 — ✅
+
+Test accounts deleted afterwards; the 39 seeded users are untouched.
+`npm run typecheck` and `next lint` both clean.
+
+**Still open in phase 2:** nothing, except what phase 6 owns — a reset link may
+not be delivered, and addresses are not verified. Both say so on screen.
+
+### The invented public record — removed ✅ (2026-09-18)
+
+**Found by the client, and the finding corrected a claim I had made twice.**
+After the public site was wired to Postgres (2026-09-16) I reported that
+"nothing in the app reads a fixture, and no screen shows invented data." The
+first half was true and remains true: `src/` imports no `mock-*` file. The
+second half was false, and the distinction is the whole point of this entry:
+
+```
+mock-*.ts  →  prisma/seed.ts  →  DATABASE  →  page  →  screen
+  (invented)                     (invented)           (shown as fact)
+```
+
+Reading a row from Postgres does not make its contents real. The pipeline was
+real; the content was seeded. `/about/editorial-board` was listing **twelve
+named scholars** — with institutions (LUMS, IBA, Aga Khan, Manchester, JNU,
+Qatar University), ORCID badges and a "12 members · 11 institutions · 4
+countries" counter — none of whom had agreed to anything. Seven articles
+carried DOIs and author bylines for research nobody wrote.
+
+This is the page DOAJ and the ISSN centre verify, and they verify it by
+**writing to the people named**. A rejected DOAJ application is not a bug to
+fix later; it is a journal's standing.
+
+**What was removed** (`scripts/clear-public-content.mjs`, dry-run by default):
+
+| Table | Rows |
+|---|---|
+| `BoardMember` | 12 |
+| `Article` | 7 |
+| `Issue` | 2 |
+| `Post` | 10 |
+| `Affiliation` | 4 of 13 — only those nothing else referenced |
+
+**What deliberately stayed.** The portal's demo data — 18 submissions, 20
+review assignments, 8 reviewer profiles, 4 production jobs, 39 profile rows.
+It sits behind a login, no indexer or applicant can see it, and it is what
+shows the client how the workflow actually runs. An empty portal demonstrates
+nothing. `Section` stayed too: those ten subject areas are the journal's own.
+
+**The seed no longer writes the public record by default.** `SEED_PUBLIC=1` is
+required for `Issue`, `Article`, `Post` and `BoardMember`; without it those
+four loops iterate an empty array. Clearing the database alone would have been
+undone by the next `npm run seed`. The submission→article back-link is guarded
+by the same flag — its target rows do not exist otherwise, and the update
+would be refused.
+
+**Emptying a table is only half the change — the screens had to be re-checked
+in the state they now render in.** Three were wrong:
+
+- `/about/editorial-board` had **no empty state at all**. It would have shown
+  "0 members · 0 institutions · 0 countries" above a blank page, which reads
+  as a broken site rather than as a journal that has not announced a board.
+  The counter is now hidden while the board is empty, and a proper empty state
+  explains that appointments are being confirmed.
+- `/articles` offered **"No articles match those filters"** with a *Clear
+  filters* button — true of a filtered search, false of an empty archive,
+  where clearing the filters reveals nothing more. The two cases are now
+  distinguished on `all.length`.
+- The homepage `StatStrip` asserted **"6 wks — median to first decision"**, a
+  figure no query produced and no manuscript had ever tested, sitting where a
+  prospective author weighs a submission against it. Replaced with
+  "Double-blind — peer review", which the journal can stand behind.
+
+`scripts/responsive-audit.mjs` had three seeded post slugs hardcoded in its
+page list, which 404'd once the posts were gone; they were dropped rather than
+replaced, since any hardcoded slug would break the same way.
+
+**Verified:** all four public tables at 0, all portal tables intact,
+`/`, `/articles`, `/issues`, `/issues/current`, `/about/editorial-board`,
+`/news`, `/announcements`, `/events` all HTTP 200 with the correct empty-state
+copy rendered. Responsive audit **0 findings across 92 of 92 pages**.
+`npm run typecheck` and `next lint` both clean.
+
+**What the client must now supply**, and no code can substitute for it: each
+real board member's name, affiliation, country, ORCID iD, role, and their
+**written agreement to be listed**. Articles are different — the journal has
+published none, so an empty archive is not a gap but the truth, and it fills
+itself through the workflow that already works end to end.
+
+**Still open from this change:** the portal's demo data carries no marker.
+18 submissions with references in the journal's own format
+(`BORJSS-2026-0044`) are indistinguishable from real ones, so a client
+walking the portal has no way to tell that none of them arrived. A marker
+should be derived from the data rather than set by a flag — the
+`seededAuditCount()` pattern — so that it disappears by itself as real work
+replaces the demo rows. Not built: where it belongs on screen is the client's
+call, not mine.
+
+### Notice boxes — the always-on `<Alert>` sweep 🟡 (2026-09-17/18)
+
+The client asked three times, the third time pointedly, before this was done
+properly. The mistake was removing them one screen at a time between other
+work: 13 files were left importing `Alert` after their last box was gone —
+dead imports that lint would have caught if it had been run at the end rather
+than the middle. All 13 are now clean.
+
+The rule that came out of it: a box that is always visible is not a warning,
+it is decoration, and a reader who learns to skip it skips the one box that
+matters. An essential fact belongs in the page's `lead`; a box is for
+something conditional on state.
+
+Boxes deliberately **kept**, each guarded or sitting where the decision is
+made: `/editorial/[id]/decision` (directly above the submit — the letter is
+still sent by hand), `/editorial/[id]/reviewers` (two facts needed *before*
+inviting), `/admin/integrations` (answers "where does the key go?"),
+`/submissions/[id]/messages` (gives the author the address and reference).
+
+### The audit log, and the last two `alert()` controls ✅ (2026-09-17)
+
+- **The eight seeded audit rows are gone**, from the database and from
+  `prisma/seed.ts`. An audit log is read precisely when someone is not
+  trusted, and invented rows beside real ones — "granted sectionEditor",
+  "reopened a review round in error" — describe things nobody did. The table
+  starts empty and fills as the journal is used, which is the correct starting
+  state for an append-only record. The screen derives its own count rather
+  than asserting one.
+- **The display was wrong in two ways**, both found by the client's own live
+  role-change test: the target column printed a raw UUID, and the detail
+  column was empty because `summariseDetail()` only read a `note` key that
+  only seeded rows carried. It now reads every detail shape the app writes
+  (all eight verified), and `listAuditEntries` batch-resolves user names in
+  one query.
+- **`expirePost` and `deletePost` now persist** — the last two `alert()`
+  stubs outside `/admin/doi`. `expirePost` sets `expiresAt` to **a second
+  ago**, not to now: every public filter keeps a post while
+  `expiresAt >= now`, so exactly-now leaves it listed. Verified against the
+  database before the second was subtracted.
+- **`getCurrentUser()` retries once after 400ms on P1001.** It runs on every
+  portal render, and a transient pooler drop was turning a blip into a
+  sign-out.
+
+### Phase 4 — issue planning ✅ (2026-09-16)
+
+The last unbuilt feature. `(dashboard)/editorial/issues/actions.ts` is new;
+`IssueForm` and `issue-contents-controls.tsx` lost their `alert()` handlers. No
+migration — the tables were already there with RLS on, as recorded.
+
+**Two tables answer "which issue is this in", and both are written together.**
+`IssuePlanItem` is the table of contents and its running order.
+`ProductionJob.issueId` is what `/production` reads to show a job its target
+date, and the seed already sets it independently — two jobs carry an `issueId`
+with no `IssuePlanItem` behind it. Writing only the first would have left a
+manuscript placed in an issue whose production row shows no deadline: nothing
+breaks, no test fails, and the queue quietly stops answering the question it
+exists for. So `placeInIssue` and `removeFromIssue` each write both inside one
+transaction.
+
+**Positions are kept contiguous.** A removal closes the gap rather than leaving
+a hole. The list renders in order either way, so a gap is invisible on screen
+while it breaks the reorder controls — the worst combination. `moveIssueItem`
+swaps through a temporary `-1` rather than assuming contiguity, so the swap
+stays correct if a row ever does slip, and stays valid if `position` is made
+unique later.
+
+**Publishing has no code path, rather than a disabled control.** `issueSchema`
+accepts `planned` and `in-production` only, so the form cannot reach
+`published` at all. A greyed-out option was considered and rejected: it is
+still a promise, and it invites "when does this open?". The screens say the
+Crossref prefix is what is missing. Every action also refuses to touch a
+published issue, since the seed contains two and their citations are in other
+people's bibliographies.
+
+**A duplicate placement is an ordinary mistake, not a 500.**
+`IssuePlanItem.submissionId` is unique — one manuscript, one issue — so
+`placeInIssue` catches `P2002`, looks up where the manuscript already sits, and
+names that issue. The same is done for `EditorialIssue`'s unique
+`(volume, number)`, reported against both fields.
+
+**Verified** by replaying each action's statements against the live database:
+place, duplicate rejected `P2002`, move up, remove with the gap closed,
+positions contiguous afterwards, and the seeded state restored. Both audits
+re-run: **0 findings across 96 of 96 pages** each. `npm run typecheck` and
+`next lint` clean.
+
+**Then walked by hand, which found four things the scripts could not.** All
+four were the same failure — a screen stating something that was not true of
+what the reader was looking at — and all four were introduced by this change,
+not inherited:
+
+1. A published issue carried the *"This issue cannot be published yet"* notice,
+   directly beneath its own **Published** badge.
+2. A published issue offered an **Edit issue** button, although `saveIssue`
+   refuses one. A button leading to a form that will not save is worse than no
+   button; the edit screen's own notice now says plainly that it will not save,
+   rather than only explaining why it should not.
+3. A published issue's empty table of contents said *"Accepted manuscripts
+   waiting for one are listed below"* — pointing at the "Available to place"
+   section, which is deliberately not rendered there.
+4. **The list screen's publishing notice is gone entirely.** That screen has no
+   publish control and never had one, so the note answered a question nobody
+   had asked — and it sat immediately below the *Published* section, reading as
+   a denial of the two issues listed above it. Publishing is a question that
+   arises on one issue, so the notice lives on `[issueId]/page.tsx` and is
+   shown only while that issue is unpublished.
+
+The lesson is the one already in `CLAUDE.md`, in its less common direction: a
+notice can be perfectly true and still be wrong, if it is placed where the
+reader can see it contradicted.
+
+**Still open:** page numbers are not recorded on `IssuePlanItem` — they are
+settled in production once galleys are final, and the screen says so — and
+publishing, which waits on the Crossref prefix.
+
+### Phase 5 — File storage: the confidential path is built and proven 🟡 (2026-09-09)
+
+Cloudinary is connected, and the part that had to be right first — a manuscript
+under review staying confidential — is built and verified against the live
+account. **What is not done: no screen uploads or downloads yet.** The wizard's
+upload step and the file lists still say they cannot, which is still true.
+
+**The finding that shaped the design.** `upload()` returns a `secure_url` that
+carries a baked-in signature (`s--2T3iEDMx--`) and **opens with a plain fetch,
+forever**, even on an `authenticated` upload. That URL is a permanent bearer
+token for a confidential file. Had it been stored in `SubmissionFile` — the
+obvious thing to do with a URL an API hands back — every manuscript in the
+journal would have been one leaked database column away from public.
+
+So `putFile` **does not return it**. It returns the `publicId` and the byte
+count, and there is no code path in `lib/storage/` that can hand a caller the
+permanent link. Verified in the same run: a `publicId` on its own opens nothing
+— `/raw/authenticated/<id>`, `/raw/upload/<id>` and the versioned form all
+answer 401 or 404 — which is what makes the id safe to store and to pass around
+inside the app.
+
+**Reads go through `/files/<id>`**, which is a stable, shareable, useless-on-
+its-own URL. It checks entitlement, then mints a **ten-minute** signed URL and
+302s to it, `Cache-Control: no-store, private`. Someone who copies a portal
+link sends a colleague to the guard, which asks who *they* are; someone who
+copies the redirected URL sends a key that has already expired. No signed URL is
+ever stored, emailed or logged.
+
+**Not-found and forbidden answer identically (404).** Probing ids would
+otherwise reveal which manuscripts exist, and on a double-blind journal that is
+itself disclosure.
+
+**The entitlement rule is its own module** (`lib/storage/entitlement.ts`), apart
+from the route handler, because it *is* the confidentiality guarantee —
+`signedUrlFor` signs whatever it is given and nothing downstream asks again. A
+mistake there is not a bug in one screen, it is every screen.
+
+**A reviewer gets the manuscript and not the title page.** `HIDDEN_FROM_REVIEWERS`
+covers `titlePage` and `coverLetter`, both of which name the authors. This is
+the same rule `ReviewTask` enforces by having no author field — stated twice
+deliberately, because a file download is a second door into the same
+information. Entitlement also requires a **live** assignment (`accepted` or
+`completed`): a declined invitation is not a standing key.
+
+**Verified against the seeded database**, on a real manuscript with a real
+assignment:
+
+| Reader | Manuscript | Title page |
+|---|---|---|
+| The author | allowed | allowed |
+| Assigned reviewer | allowed | **denied** |
+| A reviewer with no assignment on it | denied | denied |
+| An outsider with no staff role | denied | denied |
+
+Storage round-trip verified separately: upload → signed URL opens it → the id
+alone is refused (401) → delete → the previously working signed URL is gone
+(404). An expired signature is refused (401).
+
+**Published articles are the deliberate exception.** `putPublicFile` is a
+separate, differently-named function, because an open-access journal exists to
+be read and a published PDF *should* have a permanent URL. Keeping it separate
+means publishing something is a decision someone made rather than a flag
+someone forgot.
+
+**`SubmissionFile.storagePath` now documents what it holds** — the Cloudinary
+`publicId`, and only that. Its previous comment described Supabase Storage and a
+private bucket, which was the pre-Cloudinary plan.
+
+### The stale-notice sweep — every screen re-checked against the code ✅ (2026-09-09)
+
+**Found by the client, not by a test.** The login page announced "Not live yet"
+above a working sign-in form. `ScaffoldNotice` had its heading hard-coded to
+that string, written when nothing authenticated anyone; the wording inside was
+updated as features landed and the heading never was. The heading is a prop now.
+
+That prompted a sweep of every screen, and the same rot was widespread. Roughly
+a dozen notices still claimed **"there is no database"**, **"no file storage"**
+or **"no backend"** — each true when written, all false for weeks. This is the
+failure CLAUDE.md names first, and it had accumulated in the one place nobody
+re-reads: text that was correct when it was typed.
+
+| Screen | Claimed | Actually |
+|---|---|---|
+| `/dashboard` | "Portal preview — the account is a placeholder and nothing is saved" | Real account, real data. **Notice deleted** |
+| Reviewer assignment | "No invitation goes anywhere" | Saved to `ReviewAssignment` and visible in the reviewer's queue; only the email is missing |
+| `/admin/audit-log` | "Nothing writes an audit entry, every row is invented" | Announcements, messages, reviewer applications and settings all write entries |
+| `/admin/statistics` | "There is no database — computed from mock fixtures" | Computed from the database |
+| `/admin/users`, issues, production ×4 | "There is no database / no file storage" | Both exist; these screens genuinely do not save, which is a different sentence |
+| `/admin/integrations` | "No backend to hold a credential" | Credentials live in the environment, by design |
+
+**The privacy policy was the one that mattered.** It is a legal document, and
+it was wrong in three places: it said the portal was "in development" when it
+is built, it said signing in *will* set a cookie "when the portal launches"
+when signing in sets one today, and it marked manuscript submission, peer
+review and accounts as "(planned)". All corrected. Its claim that *reading* the
+site sets no cookie was left alone — still true, since the session cookie is
+only set at sign-in.
+
+**What was deliberately not changed:** the public site still routes authors to
+email rather than the portal. The wizard works end to end, but no receipt can
+be delivered — an author would submit, see a reference number, and then hear
+nothing at all, with no way to recover a forgotten password either. Advertising
+it in that state would cost more trust than it gains. That page changes the day
+a domain is verified, and it is a one-line change.
+
+Both audits still **0 findings across 96 pages**; typecheck, lint and a
+production build clean.
+
+### Admin settings — two screens moved to the database, three deliberately not ✅ (2026-09-09)
+
+**The interesting decision was which screens to leave alone.** Moving all five
+to a database would have been the obvious reading of "make settings editable",
+and three of them would have been made worse by it.
+
+| Screen | Where it lives now | Why |
+|---|---|---|
+| **Journal settings** | 12 fields in `JournalSetting`, 9 read-only from config | The editable ones are facts the journal *acquires* — an ISSN, a Crossref prefix, an office address. The rest are decisions |
+| **Sections** | `Section` table, full CRUD | Already a real table with a foreign key; only the UI was missing |
+| **Review forms** | Code | A criterion is a **key stored on every report ever returned**, not a label. Renaming one in a database leaves older reports scored against a criterion nothing can name |
+| **Policies** | Code | 17 documents of long-form prose with tables and cross-links, styled by `.prose` and checked by the a11y audit. A database editor replaces all of that with pasted HTML — and a journal's ethics policy is the last thing that should be editable without review |
+| **Email templates** | Code | Functions taking typed arguments. A mistyped placeholder in a database editor becomes an email that goes out with a blank where the manuscript number should be |
+
+**`JournalSetting` is key-value, not a one-row table with twenty columns.**
+`site.config.ts` holds around forty values and only twelve are settings; the
+rest are decisions. And those twelve arrive one at a time as the journal
+acquires them — an ISSN this year, a Crossref prefix next — where a column each
+would mean a migration each time.
+
+**The config file stays the default; a row is an override.** No row means the
+file's value stands, so a fresh database renders exactly as before. **Clearing
+a field deletes its row rather than storing `""`** — an empty string would
+assert that the journal *has* no ISSN, overriding a file value someone set.
+Verified: no row → file value; saved → override; cleared → file value again.
+
+**A settings screen that saves but changes nothing would have been the worst
+outcome**, so the readers were moved too: `/about/journal-information` now
+reads the stored values, and an ISSN entered in the portal appears there the
+same day. `hasRealDoiPrefix()` (has a prefix been *entered*) is deliberately
+separate from `hasCrossrefPrefix()` (do the minted DOIs *use* one) — the two
+differ for as long as it takes to re-mint placeholders, and that gap is worth
+being able to see.
+
+**Sections found a real bug on the way.** The wizard's section dropdown
+rendered `REVIEWER_SUBJECTS` — a list maintained for the reviewer directory —
+so an author could choose a subject with no `Section` row and the action would
+reject a choice the form had just offered. It reads the registry now.
+
+**Sections are deactivated, never deleted.** One holding manuscripts cannot be
+removed without breaking their history, and an empty one may still be named on
+the public aims & scope page. The control says "Stop offering". Verified:
+deactivating left 9 sections on offer while 3 manuscripts stayed filed under
+the tenth.
+
+**Renaming carries the manuscripts, and that is the whole point of a
+registry.** Verified against live data: renaming "Gender & Development" moved
+all 3 of its manuscripts, because they hold a foreign key rather than a copy of
+the name. **The "Gender Studies" drift is confirmed closed in the database** —
+it survives only in the source fixtures.
+
+**Two warnings remain on the sections screen, and both should.** A registry
+stops section names diverging from each other but not from `/about/aims-scope`,
+which holds its ten areas as prose — the one list still without a single
+source. So the screen warns when a section is offered but not advertised, and
+when an advertised area has no section for an author to choose.
+
+**Both actions write an audit entry** — these are the values that appear on the
+public site and in every metadata record, and "who changed the ISSN" is exactly
+what an audit log is for. The entry records **which keys changed, never their
+values**: an audit row is read by people not otherwise entitled to the contents.
+
+**`JournalSetting` needed its own `ENABLE ROW LEVEL SECURITY`.** A new table
+defaults to RLS off, and the loop in `20260908120000_enable_rls` ran before
+this table existed. Verified afterwards: **32 of 32 tables protected, none
+unrestricted.** Any future migration that adds a table must do the same.
+*(The count is 34 as of 2026-09-16 — `20260916120000_article_contributors`
+added two and enabled RLS on both. The rule held.)*
+
+**ISSN check digits are validated** (ISO 7064 MOD 11-2, `isValidIssn`), for the
+same reason as the ORCID check digit: a wrong ISSN is not discovered until an
+indexing service rejects the application months later. Tested against five real
+ISSNs and four corrupted ones — 9 of 9 correct.
+
+Production build clean; **both audits 0 findings across 96 pages**;
+`npm run typecheck` and `next lint` clean.
+
+### Phase 5, part 2 — the wizard submits, and files download ✅ (2026-09-09)
+
+**An author can now submit a manuscript end to end**, which is the journal's
+actual job and the thing every phase before this was building towards.
+
+**Step 1 creates the draft; every later step writes to it.** A draft is a
+`Submission` at status `draft`, which every editorial read already excluded —
+so a half-finished wizard was already invisible to editors before this landed.
+`.../details` still redirects to `/submissions/new`, and step 1 now redirects
+forward to `/submissions/new/<id>/upload` with a real id.
+
+**The reference comes from a Postgres sequence**, created in
+`20260909120000_submission_reference_sequence` and seeded past the existing
+fixtures so the first real submission cannot collide. Never a row count: delete
+one submission and a count reissues a reference another author has already
+quoted in an email.
+
+**Every step re-checks ownership.** `ownedDraft()` runs on each write rather
+than trusting the `draftId` in the form — a Server Action is its own entry
+point. It accepts only status `draft`, so a stale tab left open on step 3
+cannot rewrite a manuscript an editor is already reading. Someone else's draft
+id gets the same answer as a nonexistent one.
+
+**Step 6 re-validates everything from the database, not from the form.** The
+per-step checks are a courtesy to the author; steps 2–5 are reachable directly
+by URL and any of them can be skipped. So `submitSubmission` reads the draft
+back and names what is missing — manuscript, title page, abstract, keywords,
+competing interests, author list, corresponding author, declarations — rather
+than submitting an empty shell. Verified: an empty draft is refused with all
+eight named.
+
+**Double submission is refused by the query, not by a flag.** The update
+carries `status: "draft"` in its `where`, so a double-clicked button finds no
+matching row. Verified.
+
+**Contributors are replaced wholesale, never diffed.** Author order is a claim
+about contribution, and reconciling an edited list against stored rows is
+exactly where an order changes silently. Deleting and rewriting cannot reorder
+anything the author did not reorder themselves; `position` stores the index.
+
+**New columns on `Submission`** (`20260909130000_submission_wizard_fields`):
+`funding`, `conflictOfInterest`, `aiDisclosure`, `dataAvailability`,
+`declaredAt`, `coverLetter`. All nullable, because a draft acquires them step
+by step. `declaredAt` is one timestamp rather than five booleans: the five
+declarations are only ever accepted as a set, and what a later dispute needs to
+know is *when* they were made.
+
+**Downloads landed on three screens** — the editorial detail page, the author's
+revisions page, and the reviewer's task page — all through `FileLink` or the
+same `/files/<id>` href. **A reviewer's file list now also excludes the cover
+letter**, not just the title page: both name the authors. `entitlement.ts`
+already refused it, but a file listed and then refused reads as a broken
+portal, so it is not listed either.
+
+**`SubmissionFile.stored` is a boolean, deliberately not the storage path.**
+The `publicId` has no business in a rendered page — a component holding one is
+a component that could one day build a URL from it. Rows from the seed carry
+placeholder paths (`mock/s1/...`) and render as plain text rather than as a
+download that 404s.
+
+**The wizard's standing "drafts are not saved" notice is gone**, because it is
+no longer true. `WizardShell` carries no notice at all now.
+
+**Verified end to end**, against the live database and Cloudinary: draft
+created with a sequence reference → two files uploaded to
+`submissions/<id>/…` → metadata, contributors and declarations saved →
+completeness check passed → status `submitted` → **double submit refused** →
+visible to the editorial queue. An incomplete draft was refused and named all
+eight missing pieces, and stayed invisible to editors. Production build clean;
+**both audits 0 findings across 96 pages**; `npm run typecheck` and
+`next lint` clean.
+
+**What remained in phase 5 when this was written:** galley uploads in
+production, and revision uploads. **Galley uploads landed on 2026-09-14** — see
+"Phase 4/5 — production" below. Revision uploads are still open and do not
+block a submission.
+
+### The seed used to delete the only account that can sign in — fixed 2026-09-14
+
+**Symptom, because it is worth recognising again:** sign-in succeeds — Supabase
+returns a session, the Network tab shows `POST /login 200` and `/dashboard`
+compiling — and then the portal lands back on `/login` with the fields blank
+and **no error anywhere**. The server log gives it away with
+`WHERE "UserRole"."userId" IN (NULL)`.
+
+**Cause.** `User.id` *is* the `auth.users` id (phase 1), so the session is
+joined to this table on every request. `prisma/seed.ts` cleared accounts with a
+blanket `user.deleteMany()`, which is correct for the 39 fixture profiles and
+catastrophic for `ceoborjss@gmail.com` — the one account that can actually sign
+in, created through the Supabase admin API and therefore unknown to the seed.
+Running `npm run db:seed` deleted its profile row while leaving the Auth
+account intact. `getCurrentUser()` then returned null for a perfectly valid
+session, and `requireUser()` redirected to `/login`.
+
+**Fix.** The clear step now deletes only rows the seed owns — those with
+`@example.edu` or `@borjss.example` addresses, which is every fixture and
+nothing else. A re-seed can no longer lock the journal out of its own portal.
+
+**If it happens again** (an account created outside the seed, on a domain the
+filter does not cover), recreate the profile row with the *auth* id as its
+primary key:
+
+```ts
+await db.user.create({
+  data: { id: <auth.users id>, name, email, status: "active",
+          roles: { create: [{ role: "superAdmin" }] } },
+});
+```
+
+### Phase 5 — revision uploads ✅ (2026-09-14)
+
+**An author whose manuscript comes back can now return it through the portal.**
+Until now `/submissions/<id>/revisions` carried two notices telling them to
+email the editorial office instead.
+
+**The round is derived, never accepted from the form.** It is
+`Submission.round`, read on the server. A client that could name its own round
+could file against a round the editor has already closed, or overwrite round 1
+from a tab left open for a fortnight. Files are stored as `manuscript-r<round>`
+so a second revision cannot overwrite the first — the history is the entire
+point of that screen.
+
+**`revisableSubmission()` is deliberately not `ownedDraft()`.** The wizard's
+helper accepts only status `draft`, because it must not rewrite a manuscript an
+editor is reading. This one accepts only `revisionRequested`, which is the
+exact opposite case. Sharing one helper would have meant a status list long
+enough to permit both, and that list *is* the guard.
+
+**Uploading does not advance the status.** Putting the manuscript back under
+review is the editor's decision, taken on the editorial screens; an author who
+could move their own manuscript into review would be skipping the desk check.
+The form says so above the button rather than below it — an author who reads
+that after submitting has been told too late.
+
+**The response to reviewers is required, and typed rather than attached.** Same
+choice the cover letter makes on a new submission: it is stored as a
+`SubmissionMessage` so the editor reads it beside the reports instead of
+opening a file. Required because a revision with no point-by-point reply is the
+most common reason an editor sends one straight back. It is split into
+paragraphs on the way in, because `SubmissionMessage.body` is `String[]`.
+
+No migration: `responseToReviewers` was already a `SubmissionFileKind` and
+`SubmissionFile.round` already existed.
+
+### Phase 4/5 — production: stages, galleys and corrections ✅ (2026-09-14)
+
+**The production screens write.** Until now every control on all three of them
+was an `alert()` saying nothing was built — nine of them — so a journal could
+accept a manuscript and then had nowhere to record what happened to it.
+
+**One writer for every stage transition.** `moveStage()` in
+`(dashboard)/production/actions.ts` is the only thing that changes a stage,
+because the five transitions differ *only* in which timestamp they set, and
+five near-identical actions is precisely how `startedAt` ends up set on one
+path and forgotten on another. It `upsert`s on `@@unique([jobId, stage])`: the
+three stage rows are created lazily, so the first thing that happens to an
+untouched stage is its creation, and a double-clicked button finds the row
+already there rather than making a second one.
+
+**`sentToAuthorAt` is cleared when the work comes back.** Setting it is
+obvious; clearing it on the return leg is the part that would have been missed,
+and without it the queue would keep ageing a wait that had already ended —
+`stalledDays()` reads that column first.
+
+**Reopening goes to `in-progress`, not `not-started`.** Somebody still holds
+the stage, and the completion that was undone stays in the audit trail rather
+than being erased from it.
+
+**The assignee is an account id, never a typed name.** The three screens
+offered three hard-coded names as plain strings, so a stage could be assigned
+to someone with no account — who then cannot open it. `getProductionTeam()`
+reads active accounts holding a `ROLE_GROUPS.production` role, and
+`assignStage` **re-checks the id against the same role list** rather than
+trusting the option that was rendered. An empty team is stated on screen rather
+than left as a select with one disabled option, which reads as a broken
+control.
+
+**Galleys upload to confidential storage**, through the same `putFile` path as
+a manuscript — `type: "authenticated"`, no URL ever returned or stored. The
+version is **derived server-side** as one higher than the highest existing,
+never accepted from the form: letting a client send it is how two files end up
+claiming to be version 2, which is the whole point of versioning them.
+`markGalleyFinal` clears the other finals *in the same format* inside one
+transaction, because two finals is not a state anyone could later resolve from
+the data alone.
+
+**Galley reads needed their own entitlement rule, and that was the one piece
+worth slowing down for.** `entitlement.ts` only knew `SubmissionFile`;
+`ProductionGalley` is a different table with no author column to compare
+against, so extending the existing rule by analogy would have meant guessing
+which of its branches still applied — and most do not. `galleyAccessFor()` is
+therefore its own function: **production and editorial staff only**, no author
+branch and no reviewer branch at all. An author is not given a portal link to
+an unapproved galley (they would get every intermediate version), and review is
+finished by the time anything is typeset. Both reasons are written into the
+function, so a later change has to argue with them.
+
+Both kinds of file go through the **one** `/files/<id>` route, a galley via a
+`galley:` prefix — one guard, one place where a signed URL is minted, rather
+than a second handler that could drift from the first.
+
+**`ProductionGalley.storagePath` is now on the type**, so a screen can ask
+`isStoredFile()` whether there is really a file behind a row. The four seeded
+galleys predate storage and carry `mock/...` paths: they render as plain text,
+not as a download that 404s. A dead link reads as a broken portal, not as a
+file that was never uploaded.
+
+**The stale notices went with the feature**, per the standing rule — and this
+is the direction that has gone wrong here before. Four screens said production
+was "not built yet"; all four now say what is true. The proofreading one is
+deliberately **split**: the stage controls above the correction list save and
+the correction controls below it do not, and one notice covering both would
+have been wrong in one direction or the other.
+
+**Proof corrections landed too, with the migration they needed**
+(`20260914120000_proof_correction_fields`). `location` and `raisedBy` are real
+columns now. They had to be: the location used to be packed into the front of
+`description` and split back out on read, which is tolerable for a read-only
+screen and impossible once a form has to re-encode the delimiter — any
+description containing `": "` would round-trip wrong. `raisedBy` was not stored
+at all, and `toCorrection()` hard-coded `"author"`, which was wrong for every
+correction the proofreader or copyeditor raised.
+
+**The backfill splits on the FIRST `": "`, deliberately.** A location may
+contain a comma (`"References, Beck & Demirgüç-Kunt"`) and a description may
+contain a colon, so splitting on the last — or on every — separator would cut
+the wrong string. Verified against the live database afterwards: all six
+seeded corrections split correctly, including both hard cases.
+
+**One thing the verification caught.** `raisedBy` came out of the migration as
+`"author"` on all six rows — correct behaviour, since the column's backfill
+default was the only thing available and the old rows carried no such data, but
+wrong as *data*: two of the six were raised by the proofreader. The truth only
+existed in the fixtures, so a reseed restored it. Checked again after:
+`proofreader` on the footnote and reference rows, `author` on the other four.
+Worth remembering that a migration reporting success is not the same as a
+migration having produced the right data.
+
+**Applying a correction clears any decline reason.** A correction that was
+refused and is now being applied must not keep a refusal that no longer
+happened.
+
+**Two audit-script bugs found while verifying this, both pre-existing and both
+fixed.** Each script printed `across ${PAGES.length} pages` no matter how many
+actually loaded — a `fetch failed` route is skipped with `continue` and was
+still counted. A run where fourteen portal routes never loaded therefore
+reported "0 findings across 96 pages", which is the exact failure mode
+CLAUDE.md warns about: nothing breaks, no test fails, and the number stops
+being believable. Both now report *audited of listed*, list every page that did
+not load, and **exit non-zero on an incomplete run** so a failed sweep cannot
+pass for a clean one.
+
+Checks: `npm run typecheck` and `next lint` clean. No migration was needed —
+`ProductionGalley.storagePath` already existed.
+
+### The reviewer pool, and two missing links in the workflow ✅ (2026-09-16)
+
+A guided manual walkthrough of the reviewer and production paths, which found
+that **two steps of the journal's workflow had no code behind them at all**.
+Both were invisible from the screens: nothing errored, the data simply never
+appeared where the next person would look for it.
+
+#### 1. The `reviewer` role and the reviewer pool were never joined
+
+Registration grants `reviewer` to anyone who asks. But an editor's shortlist is
+built from `ReviewerProfile`, and **`reviewerProfile.create` existed only in
+`prisma/seed.ts`** — no form, no action, no admin screen wrote one. An account
+could hold the role indefinitely and never be offered to a single editor, with
+nothing on any screen explaining the silence. `/admin/reviewer-applications`
+says on its face that accepting "does not create an account", which covered
+half the gap; the other half — an account that exists but is not in the pool —
+was undocumented.
+
+**Built:** a *Reviewer pool* section on `/admin/users/[userId]/edit`, between
+Roles and Status.
+
+- `reviewerPoolSchema` (`schemas.ts`), `getReviewerPoolEntry()` (`admin.ts`),
+  `saveReviewerPool` / `removeFromReviewerPool` (users `actions.ts`),
+  `ReviewerPoolForm` (client).
+- **Expertise is a line-per-term textarea**, because `getReviewerMatches`
+  compares each term against a manuscript's keywords in *both* directions
+  (substring either way). Prose would match nothing.
+- **Sections are checkboxes built from the `Section` table, never free text**,
+  and the action re-validates against the live registry. `sectionMatch` is an
+  exact `sections.includes(...)`, so a hand-typed name silently never matches —
+  which is exactly the state three seeded profiles were in (below).
+- **Availability is deliberately not offered.** The field distinguishes the
+  reviewer's own statement ("unavailable until March") from the journal's
+  inference ("holding three already"); an administrator setting either would be
+  putting words in someone else's mouth. A new entry starts `available`.
+- Removal refuses while the reviewer holds an open invitation — a
+  `ReviewAssignment` points at the `User`, not the profile, so it would outlive
+  the pool entry and sit in their queue with nobody expecting a report.
+- Guarded on `adminOnly`, audited as `reviewerPool.added` / `.updated` /
+  `.removed`, and revalidates `/editorial/reviewers-db` plus the dynamic
+  `/editorial/[submissionId]/reviewers`. **That last call is the only
+  literal-segment `revalidatePath(..., "page")` in the codebase and is
+  unverified** — if a stale shortlist is ever reported after a pool edit, look
+  there first.
+
+No migration: `ReviewerProfile` already existed with RLS on.
+
+#### 2. Accepting a manuscript never created a production job
+
+`DECISION_EFFECT.accept` set the status to `accepted` and stopped.
+**`productionJob.create` appeared only in `prisma/seed.ts`** — the string
+"production" did not occur anywhere in `editorial/actions.ts`. Every production
+job in the database had arrived with the fixtures; **no manuscript had ever
+entered production through the app.** The editor saw a decision recorded and
+production saw nothing arrive.
+
+Fixed inside `recordDecision`'s existing transaction, so a manuscript cannot be
+accepted without its job or carry a job for a decision that rolled back. All
+three stage rows are created `notStarted` up front, because `currentStage()`
+walks them in order and the production queue reads "done of three" — a job with
+no stage rows reads as *finished* rather than as *not started*. Re-acceptance
+is guarded by a `findUnique` on the `@unique` `submissionId`; an existing job is
+left exactly as it is, since it may already carry galleys and corrections.
+
+**Verified against live data before the client used it:** the four pre-existing
+jobs were byte-identical after the change (stage, galley and correction counts
+unchanged), a simulated double-accept produced no second job, and the three
+stages came out `copyedit=notStarted, galleys=notStarted, proofread=notStarted`.
+
+#### 3. A status guard that stranded finished manuscripts
+
+`submitReview` advanced a submission to `awaitingDecision` only from
+`underReview` or `deskReview`. But inviting a reviewer straight from the queue
+is one click and leaves the status at `submitted`, so such a manuscript
+collected every report it would ever get and **never appeared in the editor's
+"decision owed" count**. The report was reachable only by opening the
+manuscript and already knowing to look. `submitted` added to the guard; the two
+stranded rows (`0079`, `0051`) were advanced by hand.
+
+#### 4. Section-name drift, fixed at source this time
+
+Three seeded profiles carried sections outside the registry — "Public Policy"
+(×2) and "Psychology" — and so matched nothing for their own subject. Repaired
+in the database, **and `resolveSectionName()` in the seed was extended** from
+two hard-coded `if`s to a `SECTION_ALIASES` map plus a **throw on any name that
+is neither canonical nor aliased**. Silent pass-through is what produced the
+drift in the first place: the row saves, the reviewer never matches, and
+nothing reports a fault. All 14 distinct fixture section values were run
+through it and resolve cleanly; the guard fires on an unknown name.
+
+The *fixtures* still carry the bad names, so `mock-reviewers.ts` remains wrong
+at source — the alias map now absorbs it rather than the database inheriting it.
+
+#### 5. Stale notices — four more, all in the "denies a feature that works" direction
+
+The failure mode this project hits most, per `CLAUDE.md`:
+
+- `/production` claimed proof corrections were "not built" — built 2026-09-14.
+- `/reviews/[reviewId]` printed "Downloads become available when the file store
+  is connected" **unconditionally**, above files that download perfectly well.
+  Now conditional, and worded as the editorial overview words it.
+- `review-form.tsx`'s success panel said "Once the backend is connected,
+  submitting marks the assignment complete, notifies the handling editor…" —
+  all of which now happens except the notification, which is stated as the gap
+  it is rather than left inside a promise about the future.
+- `/editorial/reviewers-db` said "there is no database behind it… the counts
+  come from scaffold data". Both untrue: every figure is computed from real
+  `ReviewAssignment` rows. This one actively taught editors to distrust numbers
+  that were real.
+
+Also fixed: `name.split(" ")[0]` rendered "Dr. Muhammad Sohaib" as **"Dr."** in
+two places. `givenNameOf()` in `lib/utils` skips honorifics and falls back to
+the whole string, so a title-only name never renders as a blank.
+
+#### What the walkthrough proved
+
+Reviewer path end to end, on real data: pool entry → editor's shortlist (3
+matched keywords, section chip) → invite (42-day window) → accept → report →
+read-only. **Double-blind held at every screen** — the author's name appears on
+the editorial pages and on none of the reviewer ones, enforced by `ReviewTask`
+having no author field rather than by hiding it. The 200-character floor and
+both mandatory declarations refuse a short or undeclared report.
+
+Production path: accept → job created → copyediting assigned, sent to author,
+approved, done (1 of 3). **Typesetting onward is untested** — see "► NEXT".
+
+Standing checks green throughout: `npm run typecheck` and `next lint` after
+every change. **Neither structural audit has been re-run** — see the annoyances
+list at the top.
+
+---
+
+### Phase 4 — the `/admin/users` role screen ✅ (2026-09-09)
+
+Roles and account status save. Until now they did not, so **nobody could be
+made an editor, copyeditor or managing editor** — every role came from what
+someone chose at registration (author, reviewer, or both), and the whole
+editorial and production side of the portal had screens with nobody able to
+reach them.
+
+**The rule was already written; nothing enforced it.** `assignableRoles()` has
+been in `src/config/roles.ts` since phase 12 and was applied nowhere:
+
+- a `superAdmin` grants all twelve roles, `admin` and `superAdmin` included
+- an ordinary `admin` grants the other ten, and neither of those two
+
+**It is applied to both directions of every change.** Granting a withheld role
+and *revoking* one are the same escalation — an administrator who could strip
+`superAdmin` from the account above them would have found the back door. So
+`saveUserRoles` diffs before against after and refuses if either the added or
+the removed set contains a role the actor may not grant.
+
+**Suspension obeys the same rule as revocation**, because it removes access
+just as completely. An ordinary administrator cannot suspend an `admin` or a
+`superAdmin`; without that, suspending the account above you would have been
+the escalation by another route. Nobody may change their own status either —
+an administrator who locks themselves out has no way back in.
+
+**The last super administrator cannot lose the role.** A journal with none
+cannot appoint one, because nobody left holds `roles.manageAdmins`, so the
+platform would be permanently unrecoverable. `isLastSuperAdmin()` in `admin.ts`
+warns on the form *before* the box is unticked; `saveUserRoles` counts the
+other holders and refuses regardless — the warning is a courtesy, the count is
+the guard.
+
+**Every action re-guards.** The pages call `requireGroup("adminOnly")`, but a
+Server Action is its own entry point and can be invoked without the page that
+renders its form ever loading — the same reasoning as `recordDecision` in phase
+17. Every disabled checkbox and greyed button on these screens is a courtesy to
+the reader; the server refuses independently, because a form post is trivially
+forged.
+
+**Roles are replaced wholesale, not diffed.** `UserRole` is keyed on (userId,
+role) and carries nothing else, so there is no state to preserve, and a
+delete-then-insert inside one transaction cannot leave a half-applied set the
+way a sequence of individual grants can.
+
+**Two forms, not one.** Roles and status are separate decisions with separate
+rules — an ordinary administrator may change ten roles on an ordinary account
+and nothing at all on an administrator's — so one combined form would have had
+to refuse the whole submission over either half.
+
+**The audit entry stores both sides.** `{ before, after, added, removed }`
+rather than just the new set: "who granted admin, and what did they take away
+to do it" is the question that log is read to answer.
+
+**`/admin/users/new` no longer carries a form.** It collected a name, an
+address and a set of roles and saved nothing. With everything around it now
+saving, a form that does not would be the worse failure — a reader would
+reasonably assume it works. An invited account is only useful if the invitation
+arrives, and the journal owns no domain, so the account would sit `invited`
+forever with nobody able to set its password. The page now states the route
+that works today: the person registers themselves, an administrator grants the
+roles afterwards. `user-form.tsx` was deleted with it.
+
+**The stale notices went with the feature**, per the standing rule: the users
+screen said "Account management is not built yet", the edit screen said "This
+form does not save yet", and `UserRowActions` and `UserDangerZone` both raised
+`alert("there is no database")`. All four are gone. What replaced them says
+what *is* still true — accounts cannot be created here, and why.
+
+**Deletion is still refused, deliberately.** A suspended account owns
+submissions, appears in decision history and may be an author on a published
+article. `UserDangerZone` keeps its type-the-name confirmation and now asks for
+the suspension reason in the same step, since a suspension nobody can explain
+later is not defensible against an appeal.
+
+**Checks:** `npm run typecheck` and `next lint` clean; responsive audit **0
+findings across 96 pages** with a real session. **The a11y audit was not
+completed** — the dev server hit the documented connection-pressure failure
+part-way through and the run was abandoned. Run it against a freshly started
+server before trusting its numbers.
+
+### Phase 6 — Email: connected, but it can only reach one address 🟡 (2026-09-09)
+
+Resend is wired up and sending. **The journal does not own a domain yet**, so
+Resend delivers only to the account owner's own address and only from
+`onboarding@resend.dev`; mail addressed to an author or a reviewer is accepted
+by this code and refused by the provider with a 403. That is the whole of what
+is missing, and it is a purchase, not a code change.
+
+**One module calls Resend.** `src/lib/email/send.ts`, for the same reason
+`storage.ts` will be the only caller of Cloudinary: a provider reached from
+thirty places cannot be swapped, rate-limited or audited. Brevo remains the
+documented fallback, and switching should be a change to that file alone.
+
+**Nothing throws into a Server Action.** A decision letter that fails to send
+must not roll back the decision — the editor's hour of writing is worth more
+than the notification, and the office can resend by hand. `sendEmail` returns a
+result; callers decide what to say. Every current caller treats the database
+row as the record and the mail as a courtesy, in that order.
+
+**`canReachRecipients()` exists so no screen lies.** It is false while
+`EMAIL_FROM` is still a `resend.dev` address, and it drives *wording*, not
+sending. The contact form's success text therefore says the message reached the
+editorial office — true, the row is written — and does not tell the sender to
+watch an inbox that will receive nothing. Registration's message branches on
+the actual send result rather than assuming either outcome.
+
+**Six of the fifteen templates are written**, and deliberately only those whose
+trigger exists in the code today: welcome, account invite, contact receipt,
+contact office notification, reviewer-application receipt, reviewer-application
+office notification. A template with no caller is a promise the app cannot
+keep, so the remaining nine are added as their phases land.
+`/admin/settings/email-templates` still enumerates all fifteen.
+
+**Text first, HTML optional.** Every message reads correctly with no HTML,
+because a decision letter that only renders in a graphical client is one some
+authors cannot read. None carries an unsubscribe link — these are
+transactional, the consequence of something the recipient did or of a decision
+about their own manuscript; `/profile/notifications` governs a different set.
+
+**The reply-to address is `siteConfig.contact.editorialOffice`**, never the
+sending mailbox, which nobody reads. Read from config rather than repeated in
+the templates, so the address printed on `/contact` and the one an author
+replies to cannot drift apart. The two office notifications set reply-to to the
+*sender* instead, so the office can answer without copying an address out of
+the portal.
+
+**Verified against the live Resend account:** the welcome, contact-receipt and
+contact-office messages all delivered to the owner address (inbox, not spam);
+a send to a non-owner address returned **403 — "verify a domain"**, which is
+exactly the state `canReachRecipients()` reports. `npm run typecheck` and
+`next lint` clean.
+
+**What unblocks the rest:** buy the journal's domain, verify it at
+resend.com/domains, and set `EMAIL_FROM` to an address on it. No code moves.
+Until then, **do not** switch `register`'s `email_confirm` back to `false` —
+that would create accounts whose confirmation link cannot be delivered.
+
+### Supabase Auth keys — in place (2026-09-08)
+
+`.env.local` now carries all three. Supabase has **renamed its keys**: what the
+docs and this file call `anon` / `service_role` appear in the dashboard under
+Project Settings → API Keys as **Publishable key** (`sb_publishable_…`) and
+**Secret key** (`sb_secret_…`). Same roles, new names — the env variables keep
+the conventional names so `@supabase/ssr` and every tutorial still line up.
+
+---
+
 ## Where to pick up — the backend
 
-**The frontend is finished.** Every route is built, every check is green, and
-there is no more frontend work queued. What follows needs a database, an auth
-provider, a mail provider and file storage.
+**Read "► NEXT" at the top of this file first** — it is the short answer, and
+this section is the standing detail behind it.
 
-### The two known defects in the data
+The frontend is finished and the backend nearly is. Auth, file storage and the
+database are all done; an author can submit a manuscript end to end and the
+people entitled to it can download it, and an administrator can grant the roles
+that open the editorial and production side. Galley and revision uploads landed
+2026-09-14, and the two missing workflow links — putting an account into the
+reviewer pool, and creating a production job on acceptance — landed 2026-09-16.
+**Issue planning landed the same day**, which was the last unbuilt feature.
 
-Both are visible in the app and neither is a UI bug:
+What remains is **a domain** (which unblocks all email) and **finishing the
+production walkthrough** that is currently in flight. Every remaining item is
+something money buys rather than something to write. The ► NEXT block at the
+top of this file carries the exact next actions in order.
+
+### The services, settled 2026-09-08
+
+A Supabase project now exists. Every piece is on a free tier, and none of them
+is close to its limit at this journal's scale:
+
+| Layer | Service | Free tier | Note |
+|---|---|---|---|
+| Database | Supabase Postgres | 500 MB | Paused after a week idle on free. **The shared pooler also drops the odd connection** — see the note below |
+| Auth | Supabase Auth | 50,000 monthly active users | A journal will have hundreds. Its built-in mailer is test-only, so verification and reset mail goes through the provider below |
+| Files and images | **Cloudinary** | 25 GB | Chosen over Supabase Storage (1 GB) on capacity. **See the confidentiality caveat** in the file-storage bullet below — this is the one choice with a real cost attached |
+| Email | Resend (Brevo the fallback) | 3,000/month · 9,000/month | Phase 6. Not needed to decide until then |
+
+`docs/BACKEND-PLAN.md` carries the reasoning and, for Cloudinary, the exact
+flags that keep a manuscript private.
+
+#### "Can't reach database server" — the pooler, not an outage (2026-09-17)
+
+The client hit `Invalid prisma.user.findUnique() invocation: Can't reach
+database server` as a full-page runtime error on a portal route. Both
+connection strings were verified reachable a minute later, so this was the
+shared pooler dropping a connection rather than anything being down.
+
+**Why it took the whole portal down rather than one query.**
+`getCurrentUser()` runs on every portal render, so a single dropped connection
+does not fail a page — it replaces the portal with a crash screen, for a fault
+that is over before the reader has finished reading it.
+
+`loadProfile()` in `src/lib/auth/current-user.ts` now **retries that one query
+once**, after 400ms, and only on Prisma's `P1001`. A real outage still throws,
+and should: signing someone in against a database nobody can reach would mean
+rendering a portal with no roles in it. Nothing else in the app retries —
+a failed query on one screen is a failed screen, which is the honest outcome.
+
+When diagnosing this, note that `.env.local` carries **commented-out**
+`localhost` fallbacks for `DATABASE_URL` and `DIRECT_URL` directly beneath the
+live Supabase pair. A grep that does not exclude `#` lines reports the variable
+twice and looks like a misconfiguration. It is not.
+
+### The two known defects in the data — fixed in the seeded database, still open in the fixtures
+
+Neither is a UI bug, and both are now corrected everywhere the app reads from
+the database — which, after phase 3, is every portal reader. They are listed
+here because the **source fixtures** (`mock-submissions.ts` etc.) still carry
+the original drift, so any new code path that reads those files directly
+instead of the database would reintroduce it:
 
 1. **Section name drift.** Manuscripts are filed under "Gender Studies", which
    is not one of the ten subject areas on `/about/aims-scope` — the declared
    name is "Gender & Development". `/admin/settings/sections` shows it. Fixing
    the fixtures is a five-minute change; preventing it needs sections to become
-   a registry rather than a free string on each submission.
-2. **`/admin/settings/policies` duplicates the review date**, which also lives
-   in each policy page as `updated=`. Move it onto the `POLICIES` array as a
-   `reviewedAt` field.
+   a registry rather than a free string on each submission. **Already true of
+   the database** — `Section` is a real table and the seed script corrected
+   the name on the way in.
+
+   **Wider than recorded here, and now contained (2026-09-16).**
+   `mock-reviewers.ts` carried three more: "Public Policy" (×2) and
+   "Psychology", which left those reviewers matching nothing for their own
+   subject. `resolveSectionName()` is now an alias map that **throws on any
+   name that is neither canonical nor aliased**, so the seed cannot introduce a
+   fourth silently. The fixtures themselves are still wrong; the map absorbs
+   them on the way in.
+2. ~~**`/admin/settings/policies` duplicates the review date**~~ — **fixed
+   2026-09-14.** `reviewedAt` is now a field on the `POLICIES` array in
+   `policy-page.tsx`, and it is the only place the date lives. `PolicyPage` no
+   longer takes an `updated` prop at all — it reads `policyReviewedAt(slug)` —
+   so the seventeen pages cannot drift from what the settings screen reports.
+   Removing the prop rather than defaulting it is what made the typechecker
+   find every page still passing its own. The settings screen now shows
+   genuinely per-policy dates and derives its headline figure from the
+   *oldest* policy rather than one hard-coded constant, since an average would
+   hide the single forgotten policy that the figure exists to surface. Its
+   "changing a policy" steps now say to edit `reviewedAt`, not `updated=`.
+   Note that four non-policy `DocPage` callers (`/about/journal-information`,
+   `/about/aims-scope`, `/for-authors/guidelines`,
+   `/for-reviewers/guidelines`) still pass their own `updated=` — that prop is
+   a general `DocPage` feature and was never the duplication; only the
+   seventeen policies were.
 
 ### What the backend has to do
 
 Every `TODO(backend)` in the codebase is one of these. In rough dependency
 order:
 
-- **Auth.** `src/middleware.ts` exists with its redirect commented out;
-  `getCurrentUser()` returns a fixed mock. Both are the switch. The five
-  `ScaffoldNotice` blocks come out of the auth pages at the same time.
-- **A database.** Every `src/lib/api/mock-*.ts` file is a fixture set with a
-  matching read function beside it — `submissions.ts`, `editorial.ts`,
-  `production.ts`, `admin.ts`, `reviews.ts`. Filtering, sorting and pagination
-  already live in those modules rather than in the pages, so the swap is
-  per-function.
+- **Auth — done, on Supabase Auth.** Sign-in, registration, password reset and
+  sign-out are real; the middleware redirect is live and verified against a
+  production build. What remains is not auth: address verification and reset
+  delivery both wait on phase 6, and the demo door is deliberately still open
+  (see "The demo door" below for what to delete when it closes).
+- **A database — done, on Supabase.** All
+  six portal readers (`submissions.ts`, `reviews.ts`, `editorial.ts`,
+  `production.ts`, `admin.ts` and `current-user.ts`) now query the database.
+  See "Backend progress" above for what each rewrite had to reconcile. What
+  remains is Supabase itself (a two-line env change) and phase 4, writing.
 - **A mail provider.** `/admin/settings/email-templates` enumerates all 15
   messages the portal has promised, six of which have no manual alternative.
-- **File storage.** Manuscript upload, galleys, and every download link that is
-  currently absent rather than broken.
+  **Resend**, with Brevo as the fallback if its 3,000/month free tier ever
+  proves tight — which on this journal's volume it will not.
+- **File storage — Cloudinary, not Supabase Storage.** Chosen on capacity:
+  25 GB free against Supabase's 1 GB. The trade is that **confidentiality
+  becomes opt-in**: Cloudinary's default is a permanently public URL, so every
+  upload needs `type: "authenticated"` and every read needs a short-lived
+  signed URL minted after the entitlement check. `docs/BACKEND-PLAN.md` carries
+  the code and the reasoning. Manuscript upload, galleys, and every download
+  link that is currently absent rather than broken all wait on this.
 - **Crossref membership.** No prefix means no DOI resolves; `/admin/doi` and
   `/admin/settings/journal` both say so.
 - **An ISSN and e-ISSN.** With the prefix, these are the three fields that block
   a DOAJ application.
 
-### The demo door — remove it when auth lands
+### The demo door — deleted (2026-09-09)
 
-The portal can be walked with no credentials at all. `/login` carries an
-**"Enter as super administrator"** button that sets `borjss_dev_role` and
-redirects to `/dashboard`; the six demo addresses below it still work with any
-password. Super administrator because it is the only role that reaches every
-screen — `audit.view` and `platform.manage` are withheld even from `admin`, so
-a demo signed in as anything less hits a redirect mid-walkthrough.
+**It is gone, and nothing replaces it.** The portal used to be walkable with no
+credentials at all: `/login` carried an "Enter as super administrator" button
+that set a `borjss_dev_role` cookie, six demo addresses worked with any
+password, and the middleware skipped its redirect wherever `isDemoMode()` was
+true — which was every local run and every preview deployment.
 
-A demo *password* was considered and rejected: it has to be handed to whoever
-is being shown the portal, so it is not a secret, and all it adds is a step to
-mistype. **The guard is `isDemoMode()`, not a credential.**
+Deleted in full: `signInAsDemoAdmin`, `DemoAdminEntry`, `DemoAccounts`,
+`DEMO_ACCOUNTS`, `IDENTITIES`, `devRole()`, `ROLE_COOKIE`, the `demoMode` prop,
+`isDemoMode()`, `src/lib/auth/demo-mode.ts` itself, and `BORJSS_DEMO` from both
+env files. `getCurrentUser()` now returns null when there is no session, and
+the middleware redirect has no exception.
 
-`isDemoMode()` is now open in three cases: local runs, Vercel preview
-deployments, and **`BORJSS_DEMO=1`**. That third one exists because preview
-URLs change on every push, so demoing from one means sending a fresh link each
-time; setting the variable on the Vercel project opens the demo on the stable
-production domain instead. Unsetting it closes every demo route again with no
-code change and no deploy — that property is what makes the switch safe to
-leave in the codebase.
+**Why not keep it behind the environment check.** A guard with a bypass is a
+guard nobody can reason about, and "it only opens in development" is a claim
+that has to stay true across every deployment target forever. The reason it
+existed — that most of the twelve roles had no password anyone could use — was
+answered by real accounts instead.
 
-**When auth lands, delete:** `signInAsDemoAdmin` in `(auth)/actions.ts`, its
-`DemoAdminEntry` and `DemoAccounts` panels in `login-form.tsx`, `DEMO_ACCOUNTS`
-and the `devRole()` path in `current-user.ts`, and `demo-mode.ts` itself.
+**One account can sign in.** `ceoborjss@gmail.com`, superAdmin + author +
+reviewer, created through the Supabase admin API. The other 39 `User` rows are
+seeded profiles with no auth credentials: they appear in the user directory and
+own manuscripts, and none of them can sign in.
+
+**The audits needed a real session too.** Both sent
+`borjss_dev_role=superAdmin`; without it every portal route answers 307 and an
+audit would grade the login page 96 times while reporting zero findings.
+`scripts/audit-session.mjs` signs in with `AUDIT_EMAIL` / `AUDIT_PASSWORD` from
+`.env.local` and returns the cookie `@supabase/ssr` expects. **Without those
+variables the audits print a warning saying the portal was not audited** rather
+than reporting a clean sweep of pages they never saw — the failure mode that
+mattered most to prevent.
+
+That helper reads `.env` with `split(/
+?
+/)`: a file written on Windows
+carries CRLF, and a stray `
+` inside the password fails the sign-in with no
+visible reason. It cost a debugging round here; do not "simplify" it back.
+
+**Verified after the removal**, against a production build: `/dashboard`,
+`/admin/users`, `/editorial/queue` and `/profile` all **307 → /login** with no
+session, public pages still 200, and both audits **0 findings across 96 pages**
+with a real session.
 
 ### Standing rules for whoever picks this up
 
@@ -1273,11 +3166,33 @@ and the `devRole()` path in `current-user.ts`, and `demo-mode.ts` itself.
   `node scripts/a11y-audit.mjs`, against a suffixed server on port 3100.
 - Never run an unsuffixed dev server or build while the client's is running,
   and always `rm -rf .next-build-check` afterwards.
-- Verifying admin and production screens needs a wider mock user: set
-  `current-user.ts` to include `superAdmin`, run the checks, then restore it to
-  `["author", "reviewer", "sectionEditor"]`. Check the plain `admin` case too —
-  it is the one `assignableRoles()` constrains. `docs/PORTAL-WALKTHROUGH.md` is
-  the click-through list.
+- Verifying admin and production screens needs an account that holds the roles.
+  There is no mock user to widen any more — `current-user.ts` reads the
+  Supabase session and nothing else — so sign in as `ceoborjss@gmail.com`
+  (superAdmin + author + reviewer) or grant roles from `/admin/users`. Check
+  the plain `admin` case too: it is the one `assignableRoles()` constrains.
+- ~~**`docs/PORTAL-WALKTHROUGH.md` is stale on every dynamic route.**~~ —
+  **rewritten 2026-09-14.** Every link is now a real seeded UUID, derived from
+  `prisma/seed.ts`'s deterministic `uid()` mapping (`md5("<namespace>:<mock
+  id>")` with the version and variant bits stamped) rather than guessed; the
+  submission ids were cross-checked against the ones already in
+  `scripts/responsive-audit.mjs` and match. Note that a review task's URL id is
+  its **assignment** id (`uid("assignment", "rv2:rv2")`), not the submission's
+  — `/reviews/[reviewId]` looks up `reviewAssignment`.
+
+  The ids were the smaller half of the job. The doc also asserted a pile of
+  things phases 3–5 had since falsified: that nothing saves or sends, that no
+  file can be uploaded or downloaded, that the wizard carries a "drafts are not
+  saved" notice, that the dashboard shows a "Portal preview" alert, and — in
+  the setup instructions — that you edit `current-user.ts` to swap roles and
+  restore it afterwards, which the demo-door deletion made impossible. All are
+  corrected, and the doc now lists what genuinely does not work (email beyond
+  one address, galley uploads, no Crossref prefix/ISSN). It also gained the two
+  screens it never listed, `/admin/messages` and
+  `/admin/reviewer-applications`. Its "check on every screen" list now asks
+  explicitly for stale notices in *both* directions, since a screen still
+  denying a feature that has landed is the failure mode this project hits more
+  often than the reverse.
 - **Never state on a page that a feature works when the code shows a stub.**
   Every screen currently says what it cannot do and gives the email route that
   works today. Delete those notices only when the thing they describe is real.

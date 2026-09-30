@@ -45,11 +45,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
         afterwards will use the new one.
       </AuthHeading>
 
-      <ScaffoldNotice>
-        Password reset is not live yet. This form validates what you type but
-        changes nothing.
-      </ScaffoldNotice>
-
+      {/* No standing notice: reaching this page means the emailed link was
+          exchanged for a recovery session, so submitting really does change the
+          password. */}
       <form action={formAction} className="space-y-5" noValidate>
         <input type="hidden" name="token" value={token} />
 

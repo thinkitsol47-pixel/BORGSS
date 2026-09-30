@@ -232,14 +232,27 @@ export default async function ArticlesPage({
             )}
           </div>
 
+          {/* An empty archive and an over-narrow filter are different facts,
+              and the filter wording is the wrong one for a journal that has
+              published nothing: it offers to clear filters that would reveal
+              no more than is already shown. */}
           {results.length === 0 ? (
-            <EmptyState
-              icon={FileSearch}
-              title="No articles match those filters"
-              description="Try a broader search term, or clear the filters to see everything published so far."
-              action={{ label: "Clear filters", href: "/articles" }}
-              secondaryAction={{ label: "Browse issues", href: "/issues" }}
-            />
+            all.length === 0 ? (
+              <EmptyState
+                icon={FileSearch}
+                title="No articles published yet"
+                description="The inaugural issue is in production. Published articles will be listed here, each with its own page, abstract and PDF."
+                action={{ label: "Author guidelines", href: "/for-authors/guidelines" }}
+              />
+            ) : (
+              <EmptyState
+                icon={FileSearch}
+                title="No articles match those filters"
+                description="Try a broader search term, or clear the filters to see everything published so far."
+                action={{ label: "Clear filters", href: "/articles" }}
+                secondaryAction={{ label: "Browse issues", href: "/issues" }}
+              />
+            )
           ) : (
             <>
               <ul className="grid gap-4">

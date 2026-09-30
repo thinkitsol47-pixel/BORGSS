@@ -1,209 +1,192 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { AlertTriangle, Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { Button, Field, Input } from "@/components/ui";
+import { useFormState } from "react-dom";
+import { Check, Pencil, Plus, X } from "lucide-react";
+import {
+  createSection,
+  renameSection,
+  toggleSection,
+  type SettingsState,
+} from "@/app/(dashboard)/admin/settings/actions";
+import { Alert, Button, Input } from "@/components/ui";
+import { cn } from "@/lib/utils";
+
+/**
+ * The journal's subject sections, editable.
+ *
+ * **`Section` is a real table with a foreign key**, so renaming here moves
+ * every manuscript filed under it — the whole point of the registry. Before it
+ * existed a submission's section was a plain string, and the fixtures drifted:
+ * manuscripts filed under "Gender Studies" when the declared area was
+ * "Gender & Development". Two names for one section split its queue filter in
+ * half and would split its statistics too.
+ *
+ * **Nothing is deleted.** A section holding manuscripts cannot be removed
+ * without breaking their history, and an empty one may still be named on the
+ * public aims & scope page. Deactivating stops it being offered to new authors
+ * while everything already filed under it keeps working, which is what the
+ * `active` column exists for — so the control says "Stop offering", not
+ * "Delete".
+ */
 
 export type SectionRow = {
+  id: string;
   name: string;
-  count: number;
-  /** On manuscripts but not in the declared scope — the drift this page exists to show. */
+  active: boolean;
+  submissionCount: number;
+  /** Whether the public aims & scope page declares this name. */
   declared: boolean;
 };
 
-/**
- * Add, rename and remove subject sections.
- *
- * UI ONLY. Edits live in component state and are gone on reload — there is no
- * section registry to write to, and a deployed app cannot rewrite the aims &
- * scope page it copies its list from. The form is the interface a registry will
- * attach to.
- *
- * Undeclared rows keep their marking while being edited, because renaming
- * "Gender Studies" to "Gender & Development" is exactly the operation this
- * screen exists to make possible, and the reader needs to see which row is the
- * problem while they fix it.
- */
-export function SectionsEditor({ initial }: { initial: SectionRow[] }) {
-  const [rows, setRows] = useState<SectionRow[]>(initial);
+const initialState: SettingsState = { status: "idle" };
+
+export function SectionsEditor({ sections }: { sections: SectionRow[] }) {
   const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
 
-  function startEdit(name: string) {
-    setEditing(name);
-    setDraft(name);
-    setAdding(false);
-  }
+  const [createState, createAction] = useFormState(createSection, initialState);
+  const [renameState, renameAction] = useFormState(renameSection, initialState);
+  const [toggleState, toggleAction] = useFormState(toggleSection, initialState);
 
-  function commitEdit(original: string) {
-    const name = draft.trim();
-    if (!name) return;
-    setRows((current) =>
-      current.map((r) =>
-        // Renaming a row to a declared name is the reconciliation, so the row
-        // stops being marked at the same moment.
-        r.name === original
-          ? { ...r, name, declared: r.declared || isDeclaredName(name, current) }
-          : r,
-      ),
-    );
-    setEditing(null);
-  }
-
-  function remove(name: string) {
-    setRows((current) => current.filter((r) => r.name !== name));
-  }
-
-  function add() {
-    const name = newName.trim();
-    if (!name) return;
-    setRows((current) => [...current, { name, count: 0, declared: true }]);
-    setNewName("");
-    setAdding(false);
-  }
+  // One banner for whichever action last spoke. Three separate ones would put
+  // a success message from a rename above an error from an add.
+  const last =
+    [createState, renameState, toggleState].find(
+      (s) => s.status !== "idle" && s.message,
+    ) ?? null;
 
   return (
     <div>
-      <ul className="mt-3 divide-y rounded-xl border">
-        {rows.map((row) => (
-          <li
-            key={row.name}
-            className={
-              row.declared
-                ? "p-3"
-                : "bg-warning/5 p-3"
-            }
-          >
-            {editing === row.name ? (
-              /* ------------------------------------------- rename in place */
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="min-w-0 flex-1">
-                  <Field label="Section name" htmlFor={`rename-${row.name}`}>
-                    <Input
-                      id={`rename-${row.name}`}
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      autoFocus
-                    />
-                  </Field>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <Button size="sm" onClick={() => commitEdit(row.name)}>
-                    <Check className="size-4" aria-hidden />
-                    Save
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setEditing(null)}
-                  >
-                    <X className="size-4" aria-hidden />
-                    Cancel
-                  </Button>
-                </div>
-              </div>
+      {last?.status === "error" && (
+        <Alert tone="danger" title="Could not save" className="mb-4">
+          {last.message}
+        </Alert>
+      )}
+      {last?.status === "success" && (
+        <Alert tone="success" title="Saved" className="mb-4">
+          {last.message}
+        </Alert>
+      )}
+
+      <ul className="divide-y rounded-xl border">
+        {sections.map((s) => (
+          <li key={s.id} className="p-4">
+            {editing === s.id ? (
+              <form action={renameAction} className="flex flex-wrap gap-2">
+                <input type="hidden" name="sectionId" value={s.id} />
+                <label htmlFor={`name-${s.id}`} className="sr-only">
+                  New name for {s.name}
+                </label>
+                <Input
+                  id={`name-${s.id}`}
+                  name="name"
+                  defaultValue={s.name}
+                  className="min-w-0 flex-1"
+                  autoFocus
+                />
+                <Button type="submit" size="sm">
+                  <Check className="size-4" aria-hidden />
+                  Save
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditing(null)}
+                >
+                  Cancel
+                </Button>
+              </form>
             ) : (
-              /* ------------------------------------------------- read row */
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-                  {!row.declared && (
-                    <AlertTriangle
-                      className="size-3.5 shrink-0 text-warning"
-                      aria-hidden
-                    />
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 font-medium",
+                    !s.active && "text-muted-foreground line-through",
                   )}
-                  {row.name}
-                  {!row.declared && (
-                    <span className="text-xs font-normal text-warning">
-                      not declared
-                    </span>
-                  )}
+                >
+                  {s.name}
                 </span>
 
-                <span className="flex shrink-0 items-center gap-2">
-                  <span className="text-xs text-muted-foreground">
-                    {row.count === 0 ? (
-                      "No manuscripts"
-                    ) : (
-                      <Link
-                        href={`/editorial/queue?section=${encodeURIComponent(row.name)}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {row.count}{" "}
-                        {row.count === 1 ? "manuscript" : "manuscripts"}
-                      </Link>
-                    )}
+                <span className="text-xs text-muted-foreground">
+                  {s.submissionCount === 0
+                    ? "No manuscripts"
+                    : `${s.submissionCount} manuscript${s.submissionCount === 1 ? "" : "s"}`}
+                </span>
+
+                {!s.declared && (
+                  <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                    Not on aims &amp; scope
                   </span>
+                )}
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => startEdit(row.name)}
-                    aria-label={`Rename ${row.name}`}
-                  >
-                    <Pencil className="size-3.5" aria-hidden />
-                    Rename
-                  </Button>
+                {!s.active && (
+                  <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                    Not offered
+                  </span>
+                )}
 
-                  {/* A section holding manuscripts cannot be removed without
-                      deciding where they go, and that decision needs the
-                      registry this screen does not have yet. */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => remove(row.name)}
-                    disabled={row.count > 0}
-                    aria-label={`Remove ${row.name}`}
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                    Remove
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(s.id);
+                    setAdding(false);
+                  }}
+                >
+                  <Pencil className="size-3.5" aria-hidden />
+                  Rename
+                </Button>
+
+                <form action={toggleAction}>
+                  <input type="hidden" name="sectionId" value={s.id} />
+                  <Button type="submit" size="sm" variant="outline">
+                    {s.active ? (
+                      <>
+                        <X className="size-3.5" aria-hidden />
+                        Stop offering
+                      </>
+                    ) : (
+                      <>
+                        <Check className="size-3.5" aria-hidden />
+                        Offer again
+                      </>
+                    )}
                   </Button>
-                </span>
+                </form>
               </div>
             )}
           </li>
         ))}
       </ul>
 
-      {/* ------------------------------------------------------------- add */}
-      <div className="mt-3">
+      <div className="mt-4">
         {adding ? (
-          <div className="flex flex-wrap items-end gap-2 rounded-xl border border-brand-border bg-brand-tint/30 p-3">
-            <div className="min-w-0 flex-1">
-              <Field
-                label="New section name"
-                htmlFor="new-section"
-                hint="Use the name exactly as the aims & scope page states it."
-              >
-                <Input
-                  id="new-section"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Gender & Development"
-                  autoFocus
-                />
-              </Field>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <Button size="sm" onClick={add}>
-                <Check className="size-4" aria-hidden />
-                Add
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setAdding(false);
-                  setNewName("");
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
+          <form action={createAction} className="flex flex-wrap gap-2">
+            <label htmlFor="new-section" className="sr-only">
+              New section name
+            </label>
+            <Input
+              id="new-section"
+              name="name"
+              placeholder="e.g. Migration & Diaspora Studies"
+              className="min-w-0 flex-1"
+              autoFocus
+            />
+            <Button type="submit" size="sm">
+              Add
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setAdding(false)}
+            >
+              Cancel
+            </Button>
+          </form>
         ) : (
           <Button variant="outline" onClick={() => setAdding(true)}>
             <Plus className="size-4" aria-hidden />
@@ -212,15 +195,11 @@ export function SectionsEditor({ initial }: { initial: SectionRow[] }) {
         )}
       </div>
 
-      <p className="mt-3 text-xs text-muted-foreground">
-        Changes here are not saved — there is no section registry yet, so they
-        are gone on reload.
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        Renaming moves every manuscript filed under a section — they hold a
+        reference to it, not a copy of its name. Sections are never deleted: one
+        that is no longer offered keeps its history and can be offered again.
       </p>
     </div>
   );
-}
-
-/** A renamed row is reconciled when it matches a name already declared. */
-function isDeclaredName(name: string, rows: SectionRow[]) {
-  return rows.some((r) => r.declared && r.name === name);
 }

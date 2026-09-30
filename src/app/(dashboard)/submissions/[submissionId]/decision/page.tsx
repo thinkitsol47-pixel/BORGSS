@@ -70,7 +70,11 @@ export default async function Page({
           <EmptyState
             icon={Gavel}
             title="No decision yet"
-            description="Decision letters appear here as soon as the handling editor has reached one. You will also be emailed."
+            // "You will also be emailed" was a promise the platform cannot
+            // keep: the journal owns no domain, so no mail reaches an author.
+            // Saying it here is worse than saying nothing — an author would
+            // watch an inbox instead of this page.
+            description="Decision letters appear here as soon as the handling editor has reached one. Check this page — the portal cannot email you yet, so nothing will arrive in your inbox."
           />
         ) : (
           <>

@@ -140,8 +140,8 @@ function AccountMenu({
             View site
           </MenuLink>
           <div className="mt-1 border-t pt-1">
-            {/* Clears the demo sign-in and returns to the login page. When
-                real auth lands, `/logout` destroys the session too. */}
+            {/* Revokes the Supabase session and clears the demo cookie, then
+                returns to the sign-in page. */}
             <MenuLink href="/logout" icon={LogOut}>
               Sign out
             </MenuLink>

@@ -1,28 +1,35 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
+import { db, isUuid } from "@/lib/db";
 import type {
+  GalleyFormat,
+  ProductionGalley,
   ProductionJob,
   ProductionStage,
   ProductionStageRecord,
+  ProofCorrection,
   StageState,
   Submission,
 } from "@/types";
 import {
-  mockProductionJobs,
-  mockProductionSubmissions,
-} from "./mock-production";
-import { mockSubmissions } from "./mock-submissions";
-import { mockQueueSubmissions } from "./mock-queue-submissions";
-import { mockEditorialIssues } from "./mock-issues";
+  getEditorialIssueById,
+  getEditorialSubmissionById,
+} from "./editorial";
 
 /**
  * Server-side data access for the production screens.
- * SCAFFOLD: reads mock data. Swap each body for a real query.
  *
- * Separate from `editorial.ts` for the same reason that module is separate
- * from `submissions.ts`: the question is different. Editorial asks "what is
- * waiting, and on whom?"; production asks "what is on my bench, and what is
- * blocking it?" — and the answers come from `ProductionJob`, not from
- * `Submission.status`, which has one value for all of production.
+ * Phase 3: reads Postgres through Prisma. Separate from `editorial.ts` for the
+ * same reason that module is separate from `submissions.ts`: the question is
+ * different. Editorial asks "what is waiting, and on whom?"; production asks
+ * "what is on my bench, and what is blocking it?" — and the answers come from
+ * `ProductionJob`, not from `Submission.status`, which has one value for all
+ * of production.
+ *
+ * The manuscript itself is loaded through `editorial.ts`'s DB-backed mapper
+ * (`getEditorialSubmissionById`), so a production screen renders the identical
+ * `Submission` shape every other portal screen does, and the section-name
+ * registry fix applies here too.
  */
 
 export const STAGE_ORDER: ProductionStage[] = [
@@ -44,35 +51,191 @@ export const STAGE_STATE_LABEL: Record<StageState, string> = {
   done: "Done",
 };
 
+/**
+ * Prisma Client's generated enums are camelCase (`@map()` only renames the
+ * database column); `src/types` uses the kebab-case wire values the rest of
+ * the app was built against. Same helper the other rewired modules carry.
+ */
+function camelToKebab(value: string): string {
+  return value.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+}
+
 /* ------------------------------------------------------------------ *
  * Loading.
  * ------------------------------------------------------------------ */
 
-/** Every manuscript production might hold, from all three fixture files. */
-function allSubmissions(): Submission[] {
-  return [
-    ...mockSubmissions,
-    ...mockQueueSubmissions,
-    ...mockProductionSubmissions,
-  ];
+const productionJobInclude = {
+  submission: { select: { reference: true, title: true } },
+  stages: { include: { assignedTo: { select: { name: true } } } },
+  galleys: true,
+  corrections: true,
+} satisfies Prisma.ProductionJobInclude;
+
+type ProductionJobRow = Prisma.ProductionJobGetPayload<{
+  include: typeof productionJobInclude;
+}>;
+
+/**
+ * A stage state stored on `ProductionGalley` has no label or filename column —
+ * a reader-facing label and an author-facing filename are not what production
+ * needs while a file is still being made (see the type's own comment). The
+ * screens carry their own `FORMAT_LABEL`, so the label here only has to be
+ * present and truthful; the filename is recovered from the storage key, which
+ * the seed built from it.
+ */
+const GALLEY_LABEL: Record<GalleyFormat, string> = {
+  pdf: "PDF galley",
+  xml: "JATS XML",
+  html: "HTML galley",
+  epub: "EPUB galley",
+};
+
+function basename(path: string): string {
+  const parts = path.split("/");
+  return parts[parts.length - 1] || path;
+}
+
+function toGalley(g: ProductionJobRow["galleys"][number]): ProductionGalley {
+  const format = camelToKebab(g.format) as GalleyFormat;
+  return {
+    id: g.id,
+    format,
+    label: GALLEY_LABEL[format],
+    filename: basename(g.storagePath),
+    storagePath: g.storagePath,
+    sizeBytes: g.sizeBytes === null ? 0 : Number(g.sizeBytes),
+    createdAt: g.createdAt.toISOString(),
+    version: g.version,
+    isFinal: g.isFinal,
+  };
+}
+
+/**
+ * `ProofCorrection` maps almost one-to-one now.
+ *
+ * `location` and `raisedBy` became real columns in
+ * `20260914120000_proof_correction_fields`. Until then the location was packed
+ * into the front of `description` and split back out here, and `raisedBy` was
+ * not stored at all — this function hard-coded `"author"`, which was wrong for
+ * every correction the proofreader or copyeditor raised. Both are read
+ * directly now; the split is gone.
+ *
+ * The one thing still derived is `state`: the table stores an `applied`
+ * boolean plus an optional `declinedReason`, and the three-value state the
+ * screen renders falls out of the pair. Storing it as well would allow a row
+ * that is `applied` and `rejected` at once.
+ */
+function toCorrection(
+  c: ProductionJobRow["corrections"][number],
+): ProofCorrection {
+  const state: ProofCorrection["state"] = c.applied
+    ? "applied"
+    : c.declinedReason
+      ? "rejected"
+      : "open";
+
+  return {
+    id: c.id,
+    location: c.location,
+    description: c.description,
+    raisedBy: c.raisedBy as ProofCorrection["raisedBy"],
+    raisedAt: c.reportedAt.toISOString(),
+    state,
+    resolution: c.declinedReason ?? undefined,
+  };
+}
+
+function toStageRecord(
+  s: ProductionJobRow["stages"][number],
+): ProductionStageRecord {
+  return {
+    stage: camelToKebab(s.stage) as ProductionStage,
+    state: camelToKebab(s.state) as StageState,
+    assignee: s.assignedTo?.name ?? undefined,
+    startedAt: s.startedAt?.toISOString(),
+    sentToAuthorAt: s.sentToAuthorAt?.toISOString(),
+    completedAt: s.completedAt?.toISOString(),
+    dueAt: s.dueAt?.toISOString(),
+    notes: s.notes.length ? s.notes : undefined,
+  };
+}
+
+/**
+ * The issue's target date, if the job is scheduled into one. The mock data
+ * denormalised this onto the job; the schema keeps it on `EditorialIssue`, so
+ * it is joined in here rather than stored twice.
+ */
+function toProductionJob(
+  row: ProductionJobRow,
+  targetDate: string | undefined,
+): ProductionJob {
+  return {
+    id: row.id,
+    submissionId: row.submissionId,
+    reference: row.submission.reference,
+    title: row.submission.title,
+    issueId: row.issueId ?? undefined,
+    stages: row.stages
+      .map(toStageRecord)
+      .sort(
+        (a, b) => STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage),
+      ),
+    galleys: row.galleys
+      .map(toGalley)
+      .sort((a, b) => b.version - a.version || a.format.localeCompare(b.format)),
+    corrections: row.corrections
+      .map(toCorrection)
+      .sort((a, b) => +new Date(a.raisedAt) - +new Date(b.raisedAt)),
+    enteredProductionAt: row.enteredAt.toISOString(),
+    targetDate,
+  };
+}
+
+/** Every job's issue target date, in one query rather than N. */
+async function targetDatesByIssue(
+  issueIds: string[],
+): Promise<Map<string, string>> {
+  const ids = [...new Set(issueIds)];
+  if (ids.length === 0) return new Map();
+  const issues = await db.editorialIssue.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, targetDate: true },
+  });
+  return new Map(issues.map((i) => [i.id, i.targetDate.toISOString()]));
 }
 
 export async function getProductionJobs(): Promise<ProductionJob[]> {
-  return [...mockProductionJobs];
+  const rows = await db.productionJob.findMany({
+    include: productionJobInclude,
+  });
+  const targets = await targetDatesByIssue(
+    rows.flatMap((r) => (r.issueId ? [r.issueId] : [])),
+  );
+  return rows.map((r) =>
+    toProductionJob(r, r.issueId ? targets.get(r.issueId) : undefined),
+  );
 }
 
 export async function getProductionJob(
   submissionId: string,
 ): Promise<ProductionJob | null> {
-  return (
-    mockProductionJobs.find((j) => j.submissionId === submissionId) ?? null
+  if (!isUuid(submissionId)) return null;
+  const row = await db.productionJob.findUnique({
+    where: { submissionId },
+    include: productionJobInclude,
+  });
+  if (!row) return null;
+  const targets = await targetDatesByIssue(row.issueId ? [row.issueId] : []);
+  return toProductionJob(
+    row,
+    row.issueId ? targets.get(row.issueId) : undefined,
   );
 }
 
 export async function getProductionSubmission(
   submissionId: string,
 ): Promise<Submission | null> {
-  return allSubmissions().find((s) => s.id === submissionId) ?? null;
+  return getEditorialSubmissionById(submissionId);
 }
 
 /**
@@ -88,11 +251,46 @@ export async function getProductionContext(submissionId: string) {
   ]);
   if (!job || !submission) return null;
 
-  const issue = job.issueId
-    ? (mockEditorialIssues.find((i) => i.id === job.issueId) ?? null)
-    : null;
+  const issue = job.issueId ? await getEditorialIssueById(job.issueId) : null;
 
   return { job, submission, issue };
+}
+
+/**
+ * The people who can hold a production stage.
+ *
+ * Read from the account directory rather than hard-coded: the stage screens
+ * used to offer three names as plain strings, which meant a stage could be
+ * assigned to someone who has no account and therefore cannot open it. The
+ * roles here are `ROLE_GROUPS.production` — kept in step with it by the same
+ * list the action re-checks against, because an assignee the form offers and
+ * the action refuses is the worst of both.
+ */
+export async function getProductionTeam(): Promise<
+  { id: string; name: string }[]
+> {
+  const rows = await db.user.findMany({
+    where: {
+      status: "active",
+      roles: {
+        some: {
+          role: {
+            in: [
+              "superAdmin",
+              "admin",
+              "journalManager",
+              "copyeditor",
+              "layoutEditor",
+              "proofreader",
+            ],
+          },
+        },
+      },
+    },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+  return rows;
 }
 
 /* ------------------------------------------------------------------ *

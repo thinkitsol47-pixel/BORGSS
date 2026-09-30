@@ -13,7 +13,6 @@ import {
   ReviewerStats,
 } from "@/components/portal/reviewer-stats";
 import {
-  Alert,
   Button,
   EmptyState,
   Input,
@@ -62,13 +61,13 @@ export default async function Page({
     page,
   });
 
-  const sections = getReviewerSections();
+  const sections = await getReviewerSections();
   const filtered = Boolean(q || section || availability);
 
   return (
     <PortalPage
       title="Reviewer database"
-      lead="Everyone in the reviewer pool, what they cover, and how they have performed."
+      lead="Everyone in the reviewer pool, what they cover, and how they have performed. This is a directory: invite from a manuscript's reviewers tab, and edit a pool entry from the account itself."
     >
       <form
         action="/editorial/reviewers-db"
@@ -282,14 +281,10 @@ export default async function Page({
         </>
       )}
 
-      <div className="mt-8 max-w-3xl">
-        <Alert tone="info" title="What this screen cannot do yet">
-          Reviewers cannot be added, edited or invited from here — there is no
-          database behind it. The counts and turnaround figures come from
-          scaffold data, not from real review history. Invitations are sent by
-          the editorial office by email.
-        </Alert>
-      </div>
+      {/* The notice here said the figures were real — which they are, and
+          which nothing on the page disputes — and then pointed at the two
+          screens that act. That second half is now in the lead, where it is
+          read before the table rather than after it. */}
     </PortalPage>
   );
 }

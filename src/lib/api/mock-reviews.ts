@@ -40,6 +40,7 @@ export const mockReviews: ReviewTask[] = [
         id: "f1",
         filename: "manuscript-anonymised.pdf",
         sizeBytes: 512_000,
+        stored: false,
       },
     ],
     invitationNote:
@@ -73,11 +74,13 @@ export const mockReviews: ReviewTask[] = [
         id: "f1",
         filename: "manuscript-anonymised.pdf",
         sizeBytes: 604_000,
+        stored: false,
       },
       {
         id: "f2",
         filename: "focus-group-protocol.pdf",
         sizeBytes: 98_000,
+        stored: false,
       },
     ],
     invitationNote:
@@ -111,11 +114,13 @@ export const mockReviews: ReviewTask[] = [
         id: "f1",
         filename: "manuscript-anonymised-r2.pdf",
         sizeBytes: 488_000,
+        stored: false,
       },
       {
         id: "f2",
         filename: "response-to-reviewers.pdf",
         sizeBytes: 112_000,
+        stored: false,
       },
     ],
     invitationNote:
@@ -145,6 +150,7 @@ export const mockReviews: ReviewTask[] = [
         id: "f1",
         filename: "manuscript-anonymised.pdf",
         sizeBytes: 546_000,
+        stored: false,
       },
     ],
     review: {

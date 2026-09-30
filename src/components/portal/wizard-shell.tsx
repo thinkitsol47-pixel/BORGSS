@@ -10,10 +10,9 @@ import { Alert } from "@/components/ui";
  * Step 1 lives at `/submissions/new` and does not use this, because it has no
  * draft id yet — it is the screen that would create one.
  *
- * Every step carries the same standing notice. The wizard cannot save a draft
- * without a database, so a step validates its own fields and stops; nothing
- * carries forward to the next screen. Saying that on each step is better than
- * letting someone fill in five screens and discover it at the end.
+ * There is no standing notice any more: each step writes to the draft row as
+ * the author goes, so work carries forward and the manuscript only leaves
+ * their hands at step 6.
  */
 export function WizardShell({
   draftId,
@@ -43,14 +42,8 @@ export function WizardShell({
           <WizardSteps draftId={draftId} active={active} />
         </div>
 
-        <div className="mt-6">
-          <Alert tone="warning" title="Drafts are not saved yet">
-            The portal has no database, so nothing you enter here is stored and
-            nothing carries to the next step. Each screen shows what the real
-            step will ask for and checks that your answers are valid.
-          </Alert>
-        </div>
-
+        {/* No standing notice: each step saves to the draft as you go, and
+            the manuscript is only submitted at step 6. */}
         <div className="mt-8">{children}</div>
       </div>
     </PortalPage>

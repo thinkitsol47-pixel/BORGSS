@@ -28,7 +28,6 @@ export default function Page() {
       title="Publication Ethics Policy"
       lead="This policy states what the journal expects of everyone involved in publishing a manuscript — authors, reviewers, editors and the publisher — and what happens when those expectations are not met."
       toc={TOC}
-      updated="2026-01-15"
       related={["research-integrity", "plagiarism", "retraction-correction"]}
     >
       <h2 id="basis">Basis of this policy</h2>

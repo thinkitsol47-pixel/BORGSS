@@ -3,7 +3,13 @@ import Link from "next/link";
 import { UserPlus, UserX } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
 import { listUsers, type UserSort } from "@/lib/api/admin";
-import { assignableRoles, ROLE_LABELS, ROLES, type Role } from "@/config/roles";
+import {
+  assignableRoles,
+  isSuperAdmin,
+  ROLE_LABELS,
+  ROLES,
+  type Role,
+} from "@/config/roles";
 import { PortalPage } from "@/components/layout/portal-page";
 import { UserFilters } from "@/components/portal/user-filters";
 import { UserRowActions } from "@/components/portal/user-row-actions";
@@ -66,6 +72,13 @@ export default async function Page({
   // `admin` in a list will assume the page is broken.
   const grantable = assignableRoles(actor.roles);
   const withheld = ROLES.filter((r) => !grantable.includes(r));
+
+  // An ordinary administrator may not suspend an administrator, for the same
+  // reason they may not revoke the role: suspension removes access just as
+  // completely, and would be the escalation by another route.
+  const actorIsSuper = isSuperAdmin(actor.roles);
+  const isProtected = (u: UserAccount) =>
+    !actorIsSuper && u.roles.some((r) => r === "superAdmin" || r === "admin");
 
   const filtered = Boolean(q || role || status);
 
@@ -158,7 +171,11 @@ export default async function Page({
           <ul className="mt-3 space-y-3 md:hidden">
             {items.map((user) => (
               <li key={user.id}>
-                <UserCard user={user} isMe={user.id === actor.id} />
+                <UserCard
+                  user={user}
+                  isMe={user.id === actor.id}
+                  isProtected={isProtected(user)}
+                />
               </li>
             ))}
           </ul>
@@ -221,6 +238,7 @@ export default async function Page({
                         name={user.name}
                         status={user.status}
                         isMe={user.id === actor.id}
+                        isProtected={isProtected(user)}
                       />
                     </TD>
                   </TR>
@@ -266,16 +284,11 @@ export default async function Page({
         </section>
       )}
 
-      <Alert tone="warning" title="Account management is not built yet" className="mt-8">
-        No account can be created, invited, edited, suspended or have its roles
-        changed from this screen — there is no database and no mail provider,
-        so an invitation could not be sent. When the backend lands, this screen
-        becomes the place roles are granted, and every change here writes to the{" "}
-        <Link href="/admin/audit-log" className="font-medium underline">
-          audit log
-        </Link>
-        .
-      </Alert>
+      {/* No standing notice here any more. It said roles and status save —
+          which is now simply what the screen does, and saying so on every visit
+          is the habit that teaches people to skip these boxes. The one part
+          that was still news, that an account cannot be created, is on
+          /admin/users/new, behind the button that would do it. */}
     </PortalPage>
   );
 }
@@ -337,7 +350,15 @@ function RoleChips({ roles }: { roles: Role[] }) {
   );
 }
 
-function UserCard({ user, isMe }: { user: UserAccount; isMe: boolean }) {
+function UserCard({
+  user,
+  isMe,
+  isProtected,
+}: {
+  user: UserAccount;
+  isMe: boolean;
+  isProtected: boolean;
+}) {
   return (
     <div
       className={cn(
@@ -400,6 +421,7 @@ function UserCard({ user, isMe }: { user: UserAccount; isMe: boolean }) {
           name={user.name}
           status={user.status}
           isMe={isMe}
+          isProtected={isProtected}
         />
       </div>
     </div>

@@ -22,7 +22,15 @@ export const metadata: Metadata = { title: "Integrations" };
  * secret and does not is the worst thing this screen could contain.
  */
 
-type IntegrationState = "not-connected" | "connected";
+/**
+ * `partial` exists because the mail provider is neither of the other two, and
+ * calling it "Not connected" was a lie this page told for over a week: Resend
+ * is wired, six templates are written and messages genuinely send — to exactly
+ * one address, because the journal owns no domain. "Connected" would be the
+ * worse lie of the two, since an editor would expect an author to be written
+ * to. A third state is the only honest answer.
+ */
+type IntegrationState = "not-connected" | "partial" | "connected";
 
 const INTEGRATIONS: {
   name: string;
@@ -32,6 +40,34 @@ const INTEGRATIONS: {
   /** Where the effect of its absence is already visible in the app. */
   seeAlso?: { label: string; href: string };
 }[] = [
+  /* The three the platform actually runs on come first, and they were missing
+     from this list entirely — which is why the page could say "nothing is
+     connected" while every screen on it was reading Postgres. A page that
+     lists only what is absent is not an integrations page. */
+  {
+    name: "Database — Supabase Postgres",
+    purpose:
+      "Holds everything: accounts, submissions, reviews, production, issues, the published archive and the audit log.",
+    consequence:
+      "Connected and in use by every screen on this site, public and portal alike. Row Level Security is on across all 34 tables, so a new table without its own ENABLE statement would be readable by the anon key — that is a rule to keep, not a gap.",
+    state: "connected",
+  },
+  {
+    name: "Authentication — Supabase Auth",
+    purpose:
+      "Sign-in, registration, password reset and session handling for every portal route.",
+    consequence:
+      "Connected. The middleware redirects every portal route to the login page without a session. Two things still wait on the mail provider below: email addresses are not verified on registration, and a reset link may not be delivered.",
+    state: "partial",
+  },
+  {
+    name: "File storage — Cloudinary",
+    purpose:
+      "Stores manuscripts, revisions and production galleys, and serves them to the people entitled to them.",
+    consequence:
+      "Connected, and confidential by construction: every upload is authenticated, only the publicId is stored, and a download mints a ten-minute signed URL after an entitlement check. A publicId on its own opens nothing.",
+    state: "connected",
+  },
   {
     name: "Crossref",
     purpose:
@@ -46,8 +82,8 @@ const INTEGRATIONS: {
     purpose:
       "Sends every message the platform produces: decision letters, reviewer invitations, password resets, contact-form mail.",
     consequence:
-      "Nothing is sent by the application at all. Every form validates and stops — including the contact form, the reviewer application, and the decision screen. All correspondence goes out of the editorial office by hand.",
-    state: "not-connected",
+      "Resend is connected and six of the fifteen templates are written, but the journal owns no domain — so Resend accepts mail only to the account owner's own address and refuses everything else with a 403. In practice: an author who submits gets no receipt, an invited reviewer is never told, and a forgotten password cannot be recovered. Correspondence still goes out of the editorial office by hand. Buying a domain and verifying it at resend.com/domains is the whole fix; only EMAIL_FROM changes.",
+    state: "partial",
   },
   {
     name: "ORCID",
@@ -91,6 +127,7 @@ export default async function Page() {
   await requireRoles(["superAdmin"]);
 
   const connected = INTEGRATIONS.filter((i) => i.state === "connected").length;
+  const partial = INTEGRATIONS.filter((i) => i.state === "partial").length;
   // Derived rather than asserted, so this page stops claiming "no prefix" on
   // its own the moment real DOIs are entered.
   const crossref = hasCrossrefPrefix();
@@ -98,27 +135,34 @@ export default async function Page() {
   return (
     <PortalPage
       title="Integrations"
-      lead="External services this platform depends on, and what does not work while each is unconnected."
+      lead="Every external service this platform depends on, what each one is doing today, and what does not work where one is missing or limited."
     >
+      {/* The headline counts `partial` separately rather than rounding it to
+          either neighbour: "nothing is connected" was false once Resend landed,
+          and counting it as connected would have told an editor that authors
+          are being written to. */}
       <Alert
         tone="warning"
         title={
-          connected === 0
+          connected + partial === 0
             ? "Nothing is connected"
-            : `${connected} of ${INTEGRATIONS.length} connected`
+            : partial > 0
+              ? `${connected} of ${INTEGRATIONS.length} connected, ${partial} partly`
+              : `${connected} of ${INTEGRATIONS.length} connected`
         }
       >
-        {connected === 0 ? (
+        {connected + partial === 0 ? (
           <>
             Every integration below is unconnected, and none can be configured
-            from this screen — there is no backend to hold a credential. This
-            page lists them so the consequences are visible in one place rather
-            than discovered one screen at a time.
+            from this screen — credentials live in the environment, not in the
+            database. This page lists them so the consequences are visible in
+            one place rather than discovered one screen at a time.
           </>
         ) : (
           <>
-            The remaining integrations are unconnected. Each entry states what
-            does not work while that is true.
+            None of these is configured from this screen — credentials live in
+            the environment, not in the database. Each entry states what does
+            not work while it stands as it is.
           </>
         )}
         {!crossref && (
@@ -143,17 +187,41 @@ export default async function Page() {
               <span
                 className={cn(
                   "inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-xs font-medium",
-                  i.state === "connected"
-                    ? "border-success/30 bg-success/10 text-success"
-                    : "border-border-strong bg-background text-muted-foreground",
+                  i.state === "connected" &&
+                    "border-success/30 bg-success/10 text-success",
+                  i.state === "partial" &&
+                    "border-warning/40 bg-warning/10 text-warning",
+                  i.state === "not-connected" &&
+                    "border-border-strong bg-background text-muted-foreground",
                 )}
               >
-                {i.state === "connected" ? "Connected" : "Not connected"}
+                {i.state === "connected"
+                  ? "Connected"
+                  : i.state === "partial"
+                    ? "Connected, limited"
+                    : "Not connected"}
               </span>
             </div>
 
-            <div className="mt-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-warning">
+            {/* A connected service gets a neutral panel. Leaving every entry
+                in the warning tone would have read as a problem beside the
+                three the platform runs on. */}
+            <div
+              className={cn(
+                "mt-3 rounded-lg border p-3",
+                i.state === "connected"
+                  ? "border-border bg-muted/40"
+                  : "border-warning/30 bg-warning/5",
+              )}
+            >
+              <h3
+                className={cn(
+                  "text-xs font-semibold uppercase tracking-wide",
+                  i.state === "connected"
+                    ? "text-muted-foreground"
+                    : "text-warning",
+                )}
+              >
                 What this means today
               </h3>
               <p className="mt-1.5 text-sm leading-relaxed">{i.consequence}</p>
@@ -190,9 +258,9 @@ export default async function Page() {
             Not built, and deliberately so
           </h3>
           <p className="mt-2 text-sm leading-relaxed">
-            There is no database, so there is nothing to export or erase — but
-            these are also the two operations that most need care before they
-            exist. Erasure in particular cannot be a single button: a published
+            Neither is built, and both are the operations that most need care
+            before they exist. Erasure in particular cannot be a single button:
+            a published
             article naming an author is part of the scholarly record and is not
             erasable, and the privacy policy already sets out those limits.
             Building the control before the boundary is settled is how a journal
@@ -209,13 +277,13 @@ export default async function Page() {
         </div>
       </section>
 
+      {/* Kept, and short: it answers the question this screen provokes — "where
+          do I put the key?" — and the answer is that there is deliberately
+          nowhere here to put one. */}
       <Alert tone="warning" title="No credentials are stored here" className="mt-10">
-        This screen intentionally has no API-key or password fields. A form that
-        appears to save a secret and does not is worse than no form: someone
-        would paste a live Crossref credential into it. When the backend lands,
-        credentials belong in environment configuration or a secret store, with
-        this screen showing only whether each service answers — never the key
-        itself.
+        There are no API-key fields on this screen by design. Credentials live
+        in environment configuration; this page reports only whether each
+        service answers, never the key itself.
       </Alert>
     </PortalPage>
   );

@@ -29,7 +29,6 @@ export default function Page() {
       title="Authorship Policy"
       lead="Authorship confers credit and carries accountability. This policy sets out who qualifies, how contributions are recorded, and what happens when the author list is contested."
       toc={TOC}
-      updated="2026-01-15"
       related={["publication-ethics", "conflict-of-interest", "research-integrity"]}
     >
       <h2 id="criteria">Who qualifies as an author</h2>

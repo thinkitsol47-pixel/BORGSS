@@ -28,7 +28,6 @@ export default function Page() {
       title="Peer Review Policy"
       lead="Every manuscript published in this journal has passed double-blind review by at least two independent experts. This is how that process works."
       toc={TOC}
-      updated="2026-01-15"
       related={["reviewer-ethics", "editorial-independence", "complaints-appeals"]}
     >
       <h2 id="model">Review model</h2>

@@ -1,22 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { useFormState, useFormStatus } from "react-dom";
 import { Mail, Send, X } from "lucide-react";
+import {
+  inviteReviewer,
+  withdrawAssignment,
+  type AssignmentState,
+} from "@/app/(dashboard)/editorial/actions";
 import { Button, Field, Input } from "@/components/ui";
 
-/**
- * Inviting a reviewer, and chasing one who has not replied.
- *
- * The invitation opens a panel rather than firing on click. An invitation
- * carries a due date and a note in the editor's own words, and both matter:
- * a reviewer decides whether to accept partly on why they were asked, and a
- * date chosen per manuscript beats a system default that nobody read.
- *
- * UI ONLY. Nothing is sent — there is no mail provider.
- */
+const initial: AssignmentState = { ok: false };
 
-const textareaClass =
-  "w-full rounded-lg border border-brand-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40";
+/**
+ * Inviting a reviewer, and withdrawing an invitation that has not been
+ * answered or has been accepted but not reported.
+ *
+ * The invitation opens a panel rather than firing on click — it carries a due
+ * date and a note in the editor's own words, and a reviewer decides partly on
+ * why they were asked. **No email is sent**: the invitation itself still goes
+ * out from the office by hand. What this records is that the reviewer was
+ * approached, so the reviewers page and the decision screen stay honest.
+ */
 
 /** Six weeks out, the journal's usual review window. */
 function defaultDueDate() {
@@ -26,23 +31,37 @@ function defaultDueDate() {
 }
 
 export function InviteReviewerButton({
+  submissionId,
+  reviewerId,
   reviewerName,
   reference,
+  /** True when a conflict or an existing assignment blocks the invitation. */
   disabled,
   disabledReason,
 }: {
+  submissionId: string;
+  reviewerId: string;
   reviewerName: string;
   reference: string;
-  /** True when a conflict or an existing assignment blocks the invitation. */
   disabled?: boolean;
   disabledReason?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [state, formAction] = useFormState(inviteReviewer, initial);
 
   if (disabled) {
     return (
       <span className="text-xs text-muted-foreground" title={disabledReason}>
         Cannot invite
+      </span>
+    );
+  }
+
+  if (state.ok) {
+    return (
+      <span className="text-xs font-medium text-success">
+        Invitation recorded — send it to {reviewerName} by email, quoting{" "}
+        {reference}.
       </span>
     );
   }
@@ -70,23 +89,19 @@ export function InviteReviewerButton({
         </button>
       </div>
 
-      <form
-        className="mt-3 space-y-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          alert(
-            `Nothing was sent — there is no mail provider yet.\n\nInvite ${reviewerName} by email, quoting ${reference}.`,
-          );
-        }}
-      >
+      <form action={formAction} className="mt-3 space-y-3">
+        <input type="hidden" name="submissionId" value={submissionId} />
+        <input type="hidden" name="reviewerId" value={reviewerId} />
+
         <Field
           label="Report due"
-          htmlFor={`due-${reviewerName}`}
+          htmlFor={`due-${reviewerId}`}
           required
           hint="Six weeks is the journal's usual window. Shorten it and say why in the note."
         >
           <Input
-            id={`due-${reviewerName}`}
+            id={`due-${reviewerId}`}
+            name="dueAt"
             type="date"
             defaultValue={defaultDueDate()}
             required
@@ -95,24 +110,31 @@ export function InviteReviewerButton({
 
         <Field
           label="Note to the reviewer"
-          htmlFor={`note-${reviewerName}`}
+          htmlFor={`note-${reviewerId}`}
           optional
           hint="Why you asked them specifically. It measurably raises acceptance."
         >
           <textarea
-            id={`note-${reviewerName}`}
+            id={`note-${reviewerId}`}
+            name="note"
             rows={3}
-            className={textareaClass}
+            className="w-full rounded-lg border border-brand-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             placeholder="Your work on small-firm finance makes you well placed to assess the identification strategy in section 4."
           />
         </Field>
 
+        {state.error && (
+          <p className="text-xs font-medium text-danger">{state.error}</p>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit" size="sm">
+          <SubmitButton>
             <Send className="size-3.5" aria-hidden />
-            Send invitation
-          </Button>
-          <span className="text-xs text-muted-foreground">Not sent yet</span>
+            Record invitation
+          </SubmitButton>
+          <span className="text-xs text-muted-foreground">
+            No email is sent — send it by hand
+          </span>
         </div>
       </form>
     </div>
@@ -120,53 +142,77 @@ export function InviteReviewerButton({
 }
 
 /**
- * Chase or withdraw an existing assignment.
- *
- * A reminder is offered only where it means something — an invitation nobody
- * answered, or a report past its date. Reminding someone who has already
- * reported is the bug that loses reviewers, so the button is simply absent
- * there rather than present and ignored.
+ * Withdraw an existing assignment. A reminder is a pure email action and has
+ * no database step, so it stays a note rather than a button until the mail
+ * provider lands.
  */
 export function AssignmentActions({
+  assignmentId,
   reviewerName,
   status,
 }: {
+  assignmentId: string;
   reviewerName: string;
-  status: "invited" | "accepted" | "declined" | "completed" | "overdue";
+  status:
+    | "invited"
+    | "accepted"
+    | "declined"
+    | "completed"
+    | "overdue"
+    | "withdrawn";
 }) {
-  const canRemind = status === "invited" || status === "overdue";
+  const [state, formAction] = useFormState(withdrawAssignment, initial);
   const canWithdraw = status === "invited" || status === "accepted";
+  const canRemind = status === "invited" || status === "overdue";
+
+  if (state.ok) {
+    return (
+      <span className="mt-2 block text-xs font-medium text-muted-foreground">
+        Invitation to {reviewerName} withdrawn.
+      </span>
+    );
+  }
 
   if (!canRemind && !canWithdraw) return null;
 
   return (
-    <div className="mt-2 flex flex-wrap gap-2">
+    <div className="mt-2 flex flex-wrap items-center gap-2">
       {canRemind && (
-        <button
-          type="button"
-          onClick={() =>
-            alert(
-              `Nothing was sent — there is no mail provider yet.\n\nRemind ${reviewerName} by email.`,
-            )
-          }
-          className="rounded-lg border border-brand-border px-2 py-1 text-xs font-medium text-primary transition-colors hover:border-brand hover:bg-brand-tint/50"
-        >
-          Send reminder
-        </button>
+        <span className="text-xs text-muted-foreground">
+          Reminders go by email — none is sent from here yet.
+        </span>
       )}
       {canWithdraw && (
-        <button
-          type="button"
-          onClick={() =>
-            alert(
-              "Nothing changed — there is no database yet.\n\nWithdrawing an assignment is not built.",
-            )
-          }
-          className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-danger hover:text-danger"
-        >
-          Withdraw
-        </button>
+        <form action={formAction}>
+          <input type="hidden" name="assignmentId" value={assignmentId} />
+          <WithdrawButton />
+          {state.error && (
+            <span className="ml-2 text-xs text-danger">{state.error}</span>
+          )}
+        </form>
       )}
     </div>
+  );
+}
+
+function SubmitButton({ children }: { children: React.ReactNode }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" size="sm" disabled={pending}>
+      {pending ? "Saving…" : children}
+    </Button>
+  );
+}
+
+function WithdrawButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="rounded-lg border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-danger hover:text-danger disabled:opacity-50"
+    >
+      {pending ? "Withdrawing…" : "Withdraw"}
+    </button>
   );
 }

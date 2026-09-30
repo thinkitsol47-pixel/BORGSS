@@ -1,6 +1,16 @@
 import type { ReviewerProfile } from "@/types";
 
 /**
+ * This fixture predates the `userId` field on `ReviewerProfile` (added when
+ * `inviteReviewer` needed the `User` id a `ReviewAssignment` points at). The
+ * app reads the database now, not this file — only `prisma/seed.ts` still
+ * imports it — so `userId` is filled from the mock id at export rather than
+ * hand-written on every row.
+ */
+const withUserId = (rows: Omit<ReviewerProfile, "userId">[]): ReviewerProfile[] =>
+  rows.map((r) => ({ ...r, userId: r.id }));
+
+/**
  * SCAFFOLD MOCK DATA — the reviewer directory.
  *
  * Chosen to exercise the editor's judgement rather than to look tidy. Between
@@ -13,7 +23,7 @@ import type { ReviewerProfile } from "@/types";
  * invite both and hear nothing back — the decline and unanswered counts are
  * what stop a week being lost.
  */
-export const mockReviewers: ReviewerProfile[] = [
+export const mockReviewers: ReviewerProfile[] = withUserId([
   {
     id: "r1",
     name: "Dr. Fatima Siddiqui",
@@ -182,4 +192,4 @@ export const mockReviewers: ReviewerProfile[] = [
     lastReviewedAt: "2026-08-25",
     note: "Fastest reliable turnaround in the pool. Strong on experimental design.",
   },
-];
+]);

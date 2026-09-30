@@ -31,6 +31,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { auditCookie } from "./audit-session.mjs";
 
 const base = process.argv[2] ?? "http://localhost:3000";
 
@@ -189,25 +190,41 @@ function audit(html) {
 
 const PAGES = await loadPages();
 
+const cookie = await auditCookie();
+if (!cookie) {
+  console.log(
+    "\nNo session - set AUDIT_EMAIL and AUDIT_PASSWORD in .env.local.\n" +
+      "Portal routes redirect to /login and are NOT being audited.\n",
+  );
+}
+
 let total = 0;
 const byKind = new Map();
+// Pages that never returned HTML. Kept out of the denominator: a page that was
+// not fetched was not audited, and counting it would report a clean sweep of
+// pages nobody looked at. The dev server drops connections part-way through a
+// run under this many rapid renders, which is precisely when that would lie.
+const unreachable = [];
 
 for (const path of PAGES) {
   let html;
   try {
-    // Sign in as a super administrator, the way a real reviewer of these
-    // pages would: without it every guarded route silently follows its
-    // redirect to /dashboard and the audit passes on the wrong HTML.
+    // A real signed-in session, because the portal routes are guarded and a
+    // signed-out request is redirected to /login. Without it the audit would
+    // grade the login page once per route and report a clean sweep of pages it
+    // never saw. See scripts/audit-session.mjs.
     const res = await fetch(base + path, {
-      headers: { cookie: "borjss_dev_role=superAdmin" },
+      headers: cookie ? { cookie } : {},
     });
     if (!res.ok) {
       console.log(`\n${path}\n  HTTP ${res.status}`);
+      unreachable.push(`${path} (HTTP ${res.status})`);
       continue;
     }
     html = await res.text();
   } catch (err) {
     console.log(`\n${path}\n  fetch failed: ${err.message}`);
+    unreachable.push(`${path} (fetch failed)`);
     continue;
   }
 
@@ -233,11 +250,29 @@ for (const path of PAGES) {
 }
 
 console.log("\n" + "=".repeat(60));
+// Pages actually audited, never the list length. "0 findings across 96 pages"
+// when 14 never loaded is the quietly-wrong number that stops anyone believing
+// the run.
+const audited = PAGES.length - unreachable.length;
 if (total === 0) {
-  console.log(`0 finding(s) across ${PAGES.length} pages`);
+  console.log(`0 finding(s) across ${audited} of ${PAGES.length} pages`);
 } else {
-  console.log(`${total} finding(s) across ${PAGES.length} pages\n`);
+  console.log(`${total} finding(s) across ${audited} of ${PAGES.length} pages\n`);
   for (const [kind, n] of [...byKind].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${String(n).padStart(4)}  ${kind}`);
   }
 }
+
+if (unreachable.length > 0) {
+  console.log(
+    `\n${unreachable.length} page(s) were NOT audited — this run is incomplete:`,
+  );
+  for (const p of unreachable) console.log(`  ${p}`);
+  console.log(
+    "\nRestart the dev server and run again before trusting the number above.",
+  );
+}
+
+// Non-zero on findings *or* on an incomplete run, so a failed sweep cannot pass
+// for a clean one.
+process.exit(total > 0 || unreachable.length > 0 ? 1 : 0);

@@ -78,9 +78,9 @@ export default function Page({
         </p>
 
         <div className="mt-5 text-left">
-          <ScaffoldNotice>
-            Nothing has actually been sent — the mail provider is not connected
-            yet.
+          <ScaffoldNotice title="Nothing is waiting on this" tone="info">
+            No message has been sent — email delivery is still being set up.
+            Your account works regardless, so you can sign in now.
           </ScaffoldNotice>
           <p className="text-xs leading-relaxed text-muted-foreground">
             Links expire after 24 hours. If one does not arrive, check the spam

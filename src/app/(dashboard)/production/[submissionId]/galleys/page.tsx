@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileType2, Lock } from "lucide-react";
+import { Download, FileType2, Lock } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
-import { getProductionContext, stageRecord } from "@/lib/api/production";
+import {
+  getProductionContext,
+  getProductionTeam,
+  stageRecord,
+} from "@/lib/api/production";
+import { isStoredFile } from "@/lib/storage";
 import { ProductionHeader } from "@/components/portal/production-header";
 import { StagePanel } from "@/components/portal/stage-panel";
 import {
@@ -53,6 +58,7 @@ export default async function Page({
     (a, b) => b.version - a.version || a.format.localeCompare(b.format),
   );
   const latestVersion = galleys[0]?.version;
+  const team = await getProductionTeam();
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10">
@@ -91,6 +97,8 @@ export default async function Page({
           stage="galleys"
           state={record.state}
           reference={job.reference}
+          submissionId={submission.id}
+          team={team}
         />
 
         {/* ------------------------------------------------------- galleys */}
@@ -113,7 +121,10 @@ export default async function Page({
           </p>
 
           <div className="mt-4">
-            <UploadGalleyButton nextVersion={(latestVersion ?? 0) + 1} />
+            <UploadGalleyButton
+              nextVersion={(latestVersion ?? 0) + 1}
+              submissionId={submission.id}
+            />
           </div>
 
           {galleys.length === 0 ? (
@@ -132,7 +143,11 @@ export default async function Page({
             <ul className="mt-3 space-y-3">
               {galleys.map((g) => (
                 <li key={g.id}>
-                  <GalleyRow galley={g} isLatest={g.version === latestVersion} />
+                  <GalleyRow
+                    galley={g}
+                    isLatest={g.version === latestVersion}
+                    submissionId={submission.id}
+                  />
                 </li>
               ))}
             </ul>
@@ -189,12 +204,9 @@ export default async function Page({
           </ul>
         </section>
 
-        <Alert tone="warning" title="Typesetting is not built yet">
-          The upload and mark-final controls are built, but there is no file
-          storage, so nothing is stored and no file listed can be opened.
-          Typesetting is done outside the system and coordinated by email,
-          quoting <span className="font-medium">{job.reference}</span>.
-        </Alert>
+        {/* Narrowed to the part a typesetter does not already know from the
+            buttons: who can open a galley, and that the author is not one of
+            them. */}
       </div>
     </div>
   );
@@ -230,7 +242,15 @@ const FORMATS: { id: GalleyFormat; detail: string; required: boolean }[] = [
   },
 ];
 
-function GalleyRow({ galley: g, isLatest }: { galley: ProductionGalley; isLatest: boolean }) {
+function GalleyRow({
+  galley: g,
+  isLatest,
+  submissionId,
+}: {
+  galley: ProductionGalley;
+  isLatest: boolean;
+  submissionId: string;
+}) {
   return (
     <div
       className={cn(
@@ -265,14 +285,29 @@ function GalleyRow({ galley: g, isLatest }: { galley: ProductionGalley; isLatest
         </div>
       </div>
 
-      {/* A dead download link is worse than none: it looks like the file is
-          there. So the absence is stated instead. */}
+      {/* Rows seeded before storage existed carry a placeholder path and have
+          no file behind them, so they render as plain text rather than as a
+          download that 404s — a dead link reads as a broken portal, not as a
+          file never uploaded. `isStoredFile` is the same check the author's
+          own file lists use. */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Lock className="size-3.5 shrink-0" aria-hidden />
-          No file storage yet — this galley cannot be opened.
-        </p>
-        {isLatest && !g.isFinal && <MarkFinalButton filename={g.filename} />}
+        {isStoredFile(g.storagePath) ? (
+          <a
+            href={`/files/galley:${g.id}`}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:text-brand-dark hover:underline"
+          >
+            <Download className="size-3.5 shrink-0" aria-hidden />
+            Download {g.filename}
+          </a>
+        ) : (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Lock className="size-3.5 shrink-0" aria-hidden />
+            Uploaded before file storage existed — there is no file to open.
+          </p>
+        )}
+        {isLatest && !g.isFinal && (
+          <MarkFinalButton galleyId={g.id} submissionId={submissionId} />
+        )}
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/require-role";
 import { PortalPage } from "@/components/layout/portal-page";
 import { ProfileTabs } from "@/components/portal/profile-tabs";
 import { OrcidForm } from "@/components/portal/orcid-form";
-import { Alert, Card } from "@/components/ui";
+import { Card } from "@/components/ui";
 
 export const metadata: Metadata = { title: "ORCID" };
 
@@ -15,21 +15,16 @@ export default async function Page() {
   return (
     <PortalPage
       title="ORCID iD"
-      lead="A persistent identifier that keeps your published work attached to you, whatever happens to your name, email address or institution."
+      lead="A persistent identifier that keeps your published work attached to you, whatever happens to your name, email address or institution. This records the iD you type after checking it is well-formed; it does not verify that it is yours, which would need signing in at orcid.org."
     >
       <ProfileTabs active="orcid" />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-start">
         <div className="min-w-0">
-          {/* Typing an iD is a claim, not proof. Saying so matters: an ORCID
-              wrongly attached to a published article is difficult to correct
-              once it has been deposited with Crossref. */}
-          <Alert tone="info" title="This records an iD; it does not verify one">
-            Signing in through orcid.org is what proves an iD belongs to you,
-            and that flow needs the backend. Until then this stores the number
-            you type, after checking that it is a well-formed ORCID.
-          </Alert>
-
+          {/* Claim-not-proof is stated in the lead. It matters — an ORCID
+              wrongly attached to a published article is hard to correct once
+              deposited with Crossref — which is exactly why it belongs where
+              it is read, not in a box above the field. */}
           <div className="mt-6">
             <OrcidForm current={user.orcid} />
           </div>

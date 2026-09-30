@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireUser } from "@/lib/auth/require-role";
 import { PortalPage } from "@/components/layout/portal-page";
 import { NewSubmissionForm } from "@/components/portal/new-submission-form";
+import { listActiveSections } from "@/lib/api/sections";
 
 export const metadata: Metadata = { title: "New Submission" };
 
@@ -14,18 +15,21 @@ export const metadata: Metadata = { title: "New Submission" };
  * useful at this point is kept, but as short hints beside the fields rather
  * than as pages to go and read.
  *
- * SCAFFOLD: the action validates and returns; no draft is created yet, because
- * there is no database. The remaining four steps are stubs under `[draftId]`.
+ * The action creates the draft and redirects to step 2 with its id. The
+ * section list comes from the `Section` registry rather than a constant, so an
+ * author is never offered a subject area the submission cannot be filed under.
  */
 export default async function Page() {
   await requireUser();
+
+  const sections = await listActiveSections();
 
   return (
     <PortalPage
       title="New submission"
       lead="Start by telling us what you are submitting. You can come back and change any of this before the final step."
     >
-      <NewSubmissionForm />
+      <NewSubmissionForm sections={sections.map((s) => s.name)} />
     </PortalPage>
   );
 }

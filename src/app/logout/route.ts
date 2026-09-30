@@ -1,18 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ROLE_COOKIE } from "@/lib/auth/current-user";
+import { supabaseServer } from "@/lib/auth/supabase";
 
 /**
- * Ends a demo sign-in.
+ * Ends the session.
  *
- * There is no session to destroy — only the development cookie a demo sign-in
- * set. Clearing it and returning to the sign-in page is the whole of it, and
- * the control in the topbar is no longer a link that pretends.
- *
- * When real auth lands this becomes the actual sign-out: destroy the session
- * server-side, clear its cookie, then redirect.
+ * `signOut()` revokes the Supabase session and clears its cookies; there is
+ * nothing else to clear, since the Supabase session is the only identity the
+ * app has. A GET route rather than a Server Action, so the topbar's control can
+ * stay a link and work without JavaScript.
  */
-export function GET(request: NextRequest) {
-  const res = NextResponse.redirect(new URL("/login", request.nextUrl.origin));
-  res.cookies.delete(ROLE_COOKIE);
-  return res;
+export async function GET(request: NextRequest) {
+  await supabaseServer().auth.signOut();
+  return NextResponse.redirect(new URL("/login", request.nextUrl.origin));
 }

@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ScrollText } from "lucide-react";
 import { requireRoles } from "@/lib/auth/require-role";
-import { auditActions, listAuditEntries } from "@/lib/api/admin";
+import {
+  auditActions,
+  listAuditEntries,
+  seededAuditCount,
+} from "@/lib/api/admin";
 import { PortalPage } from "@/components/layout/portal-page";
 import {
   Alert,
@@ -21,16 +25,20 @@ export const metadata: Metadata = { title: "Audit Log" };
 /**
  * The audit trail.
  *
- * The whole screen is written around one problem: **nothing in this
- * application records anything**, so every entry below is fabricated. An audit
- * log is the one screen where that matters most — it is consulted precisely
- * when someone is not trusted, and a log that looks real but is invented is
- * worse than no log at all.
+ * **This screen is live.** `recordAudit()` is called from 36 places —
+ * decisions, reviewer assignment and withdrawal, role and status changes, the
+ * reviewer pool, every production stage transition, galleys, proof
+ * corrections, issue planning, announcements, the two public-form queues and
+ * journal settings — and each writes one append-only row.
  *
- * So the illustrative notice is the first thing on the page, in the warning
- * tone, above the table rather than beneath it. The rows are kept because the
- * shape — actor, action, target, detail, timestamp — is what the backend has
- * to produce, and it is easier to build against something visible.
+ * It was written before any of that existed, around the opposite problem: the
+ * rows were fabricated, and an audit log is the one screen where that matters
+ * most, because it is consulted precisely when someone is not trusted. The
+ * notice at the top has been narrowed to what is still true rather than
+ * removed, because two things remain: the eight seeded rows describe events
+ * that never happened, and **reads are not recorded** — a write-only log
+ * misses someone opening a manuscript they have no reason to see, which is
+ * exactly what the specification below says this log is for.
  */
 export default async function Page({
   searchParams,
@@ -40,29 +48,58 @@ export default async function Page({
   // `audit.view` is one of the four permissions withheld from `admin`.
   await requireRoles(["superAdmin"]);
 
-  const actions = auditActions();
+  const actions = await auditActions();
   const action = actions.includes(searchParams?.action ?? "")
     ? searchParams?.action
     : undefined;
 
-  const entries = await listAuditEntries(action);
+  const [entries, seeded] = await Promise.all([
+    listAuditEntries(action),
+    seededAuditCount(),
+  ]);
 
   return (
     <PortalPage
       title="Audit log"
       lead="The record of who changed what, and when. Visible to super administrators only."
     >
-      <Alert tone="warning" title="These entries are illustrative, not real">
+      {/* This notice used to say the whole screen was illustrative and that
+          editorial decisions, role grants and production work "do not write
+          entries yet". All three do, from 36 call sites.
+
+          The seeded count is derived, not written here, so the sentence
+          corrects itself: it drops as real entries accumulate and the first
+          paragraph stands alone once a reseed stops replacing them. A
+          hard-coded "eight" would have become wrong the day someone reseeded
+          with a different fixture. */}
+      <Alert
+        tone={seeded > 0 ? "warning" : "info"}
+        title={
+          seeded > 0
+            ? `${seeded} ${seeded === 1 ? "row" : "rows"} here ${seeded === 1 ? "was" : "were"} seeded, not recorded`
+            : "Every row here was recorded by the application"
+        }
+      >
         <p>
-          Nothing on this platform writes an audit entry. There is no database,
-          and no action anywhere in the portal is recorded. Every row below was
-          written by hand to show the shape the real log must take — actor,
-          action, target and timestamp — and none of it happened.
+          <strong>The log is live.</strong> Editorial decisions, reviewer
+          assignments, role and status changes, the reviewer pool, production
+          stages, galleys, proof corrections, issue planning, announcements,
+          contact messages, reviewer applications and journal settings all write
+          an entry as they happen.
         </p>
+        {seeded > 0 && (
+          <p className="mt-2">
+            What is not real are the {seeded} rows the seed wrote to show the
+            shape the log takes — actor, action, target, detail and timestamp.
+            Those events did not happen, and they are dated before this database
+            existed. They disappear the first time the seed is not re-run.
+          </p>
+        )}
         <p className="mt-2">
-          Treat this screen as a specification until the backend lands. An audit
-          log is consulted when someone is not trusted; one that looked
-          authoritative while being invented would be worse than none.
+          <strong>Reads are still not recorded</strong>, only writes — see the
+          specification below. Someone opening a manuscript they have no reason
+          to see is exactly what an audit log exists to surface, and this one
+          would not show it.
         </p>
       </Alert>
 
@@ -165,16 +202,23 @@ export default async function Page({
       {/* ------------------------------------------- what the real one needs */}
       <section aria-labelledby="spec-heading" className="mt-10">
         <h2 id="spec-heading" className="font-serif text-lg font-semibold">
-          What the real log has to do
+          What this log has to keep
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Recorded here because it is the specification, and because these are
-          the properties that are hard to add afterwards.
+          Written down because these are the properties that are hard to add
+          afterwards. Four of the five hold today; recording reads does not.
         </p>
         <dl className="mt-4 divide-y rounded-xl border">
           {REQUIREMENTS.map((r) => (
             <div key={r.title} className="p-4">
-              <dt className="text-sm font-medium">{r.title}</dt>
+              <dt className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                {r.title}
+                {"outstanding" in r && (
+                  <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                    Not yet
+                  </span>
+                )}
+              </dt>
               <dd className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 {r.detail}
               </dd>
@@ -188,7 +232,7 @@ export default async function Page({
         <Link href="/admin/users" className="font-medium text-primary hover:underline">
           users screen
         </Link>
-        ; every change there will write an entry here.
+        ; every change there writes an entry here.
       </p>
     </PortalPage>
   );
@@ -218,6 +262,10 @@ const REQUIREMENTS = [
     title: "Reads are recorded, not only writes",
     detail:
       "Someone opening a manuscript they have no editorial reason to see is the kind of thing an audit log exists to surface. A write-only log misses it entirely.",
+    // The one item on this list that is not met. Marked rather than left
+    // looking identical to the four that are — a specification whose unmet
+    // requirement reads the same as its met ones tells the reader nothing.
+    outstanding: true,
   },
   {
     title: "Retention is stated in the privacy policy",

@@ -137,10 +137,23 @@ export function SettingRow({
 }
 
 /**
- * Where a screen's values actually live.
+ * Where a screen's values actually live — **development only**.
  *
- * Every settings page ends with one of these. It is the difference between
- * "this page does nothing" and "this page tells you where the switch is".
+ * This names source files and explains implementation decisions, which is
+ * written for whoever maintains the platform, not for the journal's editorial
+ * office. An administrator opening `/admin/settings/policies` has no use for
+ * `src/components/layout/policy-page.tsx` or for the history of a field that
+ * used to be duplicated; to them it reads as debugging output left on a page
+ * they were told is finished.
+ *
+ * So it renders in development and disappears in production. Deleting it
+ * outright was the alternative and is worse: the reasoning is genuinely useful
+ * while working on these screens, and each note explains *why* a setting is
+ * not editable — which is the question the next person will ask. Hiding it
+ * keeps both audiences right.
+ *
+ * The guard is evaluated on the server at render time, so nothing reaches the
+ * browser in production — the text is not merely hidden with CSS.
  */
 export function SourceNote({
   file,
@@ -149,10 +162,17 @@ export function SourceNote({
   file: string;
   children: React.ReactNode;
 }) {
+  if (process.env.NODE_ENV === "production") return null;
+
   return (
     <div className="mt-8 rounded-xl border border-brand-border bg-brand-tint/30 p-4">
       <h2 className="text-sm font-semibold text-brand-darker">
         Where these live
+        {/* Named as what it is, so nobody mistakes it for guidance meant for
+            the editorial office. */}
+        <span className="ml-2 font-normal text-muted-foreground">
+          · developer note, hidden in production
+        </span>
       </h2>
       <p className="mt-1.5 text-sm leading-relaxed">
         <code className="font-mono text-[0.9em]">{file}</code>

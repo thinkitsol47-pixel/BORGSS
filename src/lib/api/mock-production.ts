@@ -62,6 +62,7 @@ export const mockProductionSubmissions: Submission[] = [
         sizeBytes: 486_000,
         uploadedAt: "2026-07-30",
         round: 1,
+        stored: false,
       },
       {
         id: "pf2",
@@ -70,6 +71,7 @@ export const mockProductionSubmissions: Submission[] = [
         sizeBytes: 38_000,
         uploadedAt: "2026-01-19",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [
@@ -155,6 +157,7 @@ export const mockProductionSubmissions: Submission[] = [
         sizeBytes: 512_000,
         uploadedAt: "2026-06-10",
         round: 1,
+        stored: false,
       },
     ],
     decisions: [
@@ -213,6 +216,7 @@ export const mockProductionSubmissions: Submission[] = [
         sizeBytes: 445_000,
         uploadedAt: "2026-03-30",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [
@@ -326,6 +330,10 @@ export const mockProductionJobs: ProductionJob[] = [
         format: "pdf",
         label: "PDF galley",
         filename: "borjss-2026-0021-v1.pdf",
+        // A placeholder path, deliberately not under `submissions/`, so
+        // `isStoredFile()` reports false and the screen renders a plain row
+        // instead of a download link to a file that was never uploaded.
+        storagePath: "mock/p2/borjss-2026-0021-v1.pdf",
         sizeBytes: 1_240_000,
         createdAt: "2026-08-04",
         version: 1,
@@ -379,6 +387,7 @@ export const mockProductionJobs: ProductionJob[] = [
         format: "pdf",
         label: "PDF galley",
         filename: "borjss-2025-0004-v1.pdf",
+        storagePath: "mock/s5/borjss-2025-0004-v1.pdf",
         sizeBytes: 1_180_000,
         createdAt: "2026-07-24",
         version: 1,
@@ -389,6 +398,7 @@ export const mockProductionJobs: ProductionJob[] = [
         format: "pdf",
         label: "PDF galley",
         filename: "borjss-2025-0004-v2.pdf",
+        storagePath: "mock/s5/borjss-2025-0004-v2.pdf",
         sizeBytes: 1_196_000,
         createdAt: "2026-08-28",
         version: 2,
@@ -399,6 +409,7 @@ export const mockProductionJobs: ProductionJob[] = [
         format: "xml",
         label: "JATS XML",
         filename: "borjss-2025-0004-v2.xml",
+        storagePath: "mock/s5/borjss-2025-0004-v2.xml",
         sizeBytes: 148_000,
         createdAt: "2026-08-28",
         version: 2,

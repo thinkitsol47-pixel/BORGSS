@@ -29,7 +29,6 @@ export default function Page() {
       title="Copyright Policy"
       lead="Authors keep the copyright in what they publish here. The journal takes no transfer of ownership and no exclusive rights — only what it needs to publish the work and keep it available."
       toc={TOC}
-      updated="2026-01-15"
       related={["licensing", "open-access", "authorship"]}
     >
       <h2 id="ownership">Who owns the copyright</h2>

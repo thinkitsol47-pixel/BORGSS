@@ -219,6 +219,18 @@ const DASHBOARD_NAV: DashboardNavSection[] = [
         permissions: ["users.manage"],
       },
       {
+        title: "Messages",
+        href: "/admin/messages",
+        icon: "Mail",
+        permissions: ["users.manage"],
+      },
+      {
+        title: "Reviewer Applications",
+        href: "/admin/reviewer-applications",
+        icon: "UserPlus",
+        permissions: ["users.manage"],
+      },
+      {
         title: "Settings",
         href: "/admin/settings/journal",
         icon: "Settings",

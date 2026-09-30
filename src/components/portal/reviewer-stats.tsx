@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type { ReviewerProfile } from "@/types";
 
 /**
@@ -98,8 +98,10 @@ export function AvailabilityBadge({
       className: "border-success/30 bg-success/10 text-success",
     },
     unavailable: {
+      // Same raw-ISO bug as the conflict line in `editorial.ts` — the badge
+      // was showing the full timestamp rather than a readable date.
       label: r.unavailableUntil
-        ? `Unavailable to ${r.unavailableUntil}`
+        ? `Unavailable to ${formatDate(r.unavailableUntil)}`
         : "Unavailable",
       className: "border-border bg-muted text-muted-foreground",
     },

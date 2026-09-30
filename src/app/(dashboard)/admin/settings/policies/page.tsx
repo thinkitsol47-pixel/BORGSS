@@ -4,7 +4,6 @@ import { ExternalLink } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
 import { SettingsPage, SourceNote } from "@/components/layout/settings-page";
 import { POLICIES } from "@/components/layout/policy-page";
-import { Alert } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Policy Pages" };
@@ -23,30 +22,45 @@ export const metadata: Metadata = { title: "Policy Pages" };
  * a policy that needs a rich-text editor.
  */
 
-/**
- * All seventeen carry `updated="2026-01-15"` — they were written in one pass
- * during step 10. Held here rather than parsed out of the page components,
- * which a server component cannot do without reading its own source.
- *
- * This duplication is real and is called out on the page: if a policy's date
- * is changed in its own file and not here, this screen goes stale. The fix is
- * a `reviewedAt` field on the `POLICIES` array itself, which is a small change
- * worth making the next time a policy is genuinely revised.
- */
-const REVIEWED = "2026-01-15";
-
 /** How long a policy may go unreviewed before it is worth revisiting. */
 const REVIEW_INTERVAL_MONTHS = 24;
+
+/** Whole months between a review date and now. */
+function monthsSince(date: string, now: Date): number {
+  return Math.floor(
+    (now.getTime() - new Date(date).getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+  );
+}
 
 export default async function Page() {
   await requireGroup("adminOnly");
 
   const now = new Date();
-  const reviewed = new Date(REVIEWED);
-  const monthsSince = Math.floor(
-    (now.getTime() - reviewed.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+
+  // The dates come from the POLICIES array, which each policy page also reads.
+  // This screen used to hard-code one constant beside them, so a policy revised
+  // in its own file left this page reporting the old date.
+  //
+  // The headline figure is the *oldest* policy, not an average and not the
+  // newest: the question an editorial board is asking is "what have we let go
+  // stale", and averaging one forgotten policy against sixteen fresh ones hides
+  // exactly the row worth finding.
+  const oldest = [...POLICIES].sort((a, b) =>
+    a.reviewedAt.localeCompare(b.reviewedAt),
+  )[0];
+  const oldestMonths = monthsSince(oldest.reviewedAt, now);
+  const dueInMonths = REVIEW_INTERVAL_MONTHS - oldestMonths;
+
+  // Whether every policy still carries the same date, which is true today: all
+  // seventeen were written in one pass during step 10. The copy below branches
+  // on this rather than asserting it, so it stops claiming "all seventeen" of
+  // its own accord once one is revised.
+  const allSameDate = POLICIES.every(
+    (p) => p.reviewedAt === POLICIES[0].reviewedAt,
   );
-  const dueInMonths = REVIEW_INTERVAL_MONTHS - monthsSince;
+  const overdue = POLICIES.filter(
+    (p) => monthsSince(p.reviewedAt, now) >= REVIEW_INTERVAL_MONTHS,
+  );
 
   return (
     <SettingsPage
@@ -54,20 +68,9 @@ export default async function Page() {
       title="Policy pages"
       lead="The seventeen editorial policies, when each was last reviewed, and where they are written."
     >
-      <Alert tone="info" title="These pages are code, not content">
-        <p>
-          Each policy is a React component with its prose written inline. That
-          is deliberate: it means the pages are typechecked, their internal
-          links are verified at build time, and a change to a policy arrives as
-          a reviewable diff rather than as an untracked edit to a database row.
-        </p>
-        <p className="mt-2">
-          The cost is that they cannot be edited from here. For an editorial
-          policy that is the right trade — a policy is a commitment the journal
-          makes to authors, and it should be harder to change than a
-          notice.
-        </p>
-      </Alert>
+      {/* The "these pages are code" box is gone: the SourceNote at the foot of
+          this page makes the same point and names the files, which is the part
+          someone acting on it needs. */}
 
       {/* --------------------------------------------------- review status */}
       <section aria-labelledby="review-heading" className="mt-8">
@@ -75,20 +78,40 @@ export default async function Page() {
           Review status
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          All seventeen were written in one pass and carry the same review date.
-          A policy nobody has read in years is the real risk here — far more
-          than the absence of an editor for one.
+          {allSameDate ? (
+            <>
+              All {POLICIES.length} were written in one pass and still carry the
+              same review date. A policy nobody has read in years is the real
+              risk here — far more than the absence of an editor for one.
+            </>
+          ) : (
+            <>
+              The figure below is the policy that has gone longest without a
+              look, not an average — one forgotten policy among sixteen fresh
+              ones is exactly what an average would hide.
+            </>
+          )}
         </p>
 
         <div className="mt-3 rounded-xl border p-5">
           <p className="font-serif text-3xl font-semibold tabular-nums">
-            {monthsSince}
+            {oldestMonths}
             <span className="ml-2 font-sans text-base font-normal text-muted-foreground">
-              {monthsSince === 1 ? "month" : "months"} since review
+              {oldestMonths === 1 ? "month" : "months"} since review
             </span>
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Last reviewed {formatDate(REVIEWED)}.{" "}
+            {allSameDate ? (
+              <>Last reviewed {formatDate(oldest.reviewedAt)}. </>
+            ) : (
+              <>
+                Oldest is{" "}
+                <span className="font-medium text-foreground">
+                  {oldest.title}
+                </span>
+                , reviewed {formatDate(oldest.reviewedAt)}.{" "}
+              </>
+            )}
             {dueInMonths > 0 ? (
               <>
                 Next review due in about{" "}
@@ -99,7 +122,9 @@ export default async function Page() {
               </>
             ) : (
               <span className="font-medium text-warning">
-                Past the {REVIEW_INTERVAL_MONTHS}-month review interval.
+                {overdue.length === POLICIES.length
+                  ? `All ${POLICIES.length} are past the ${REVIEW_INTERVAL_MONTHS}-month review interval.`
+                  : `${overdue.length} of ${POLICIES.length} ${overdue.length === 1 ? "is" : "are"} past the ${REVIEW_INTERVAL_MONTHS}-month review interval.`}
               </span>
             )}
           </p>
@@ -141,7 +166,7 @@ export default async function Page() {
                 </p>
               </div>
               <span className="shrink-0 text-xs text-muted-foreground">
-                Reviewed {formatDate(REVIEWED)}
+                Reviewed {formatDate(p.reviewedAt)}
               </span>
             </li>
           ))}
@@ -186,13 +211,24 @@ export default async function Page() {
           prose.
         </p>
         <p className="mt-2">
-          The review date is the one thing duplicated: it lives in each page as{" "}
-          <code className="font-mono text-[0.9em]">updated=</code> and again in
-          this screen. Moving it onto the{" "}
-          <code className="font-mono text-[0.9em]">POLICIES</code> array as a{" "}
-          <code className="font-mono text-[0.9em]">reviewedAt</code> field would
-          remove the duplication and let this page show genuinely per-policy
-          dates — worth doing the next time a policy is actually revised.
+          The review date lives in exactly one place: a{" "}
+          <code className="font-mono text-[0.9em]">reviewedAt</code> field on
+          the <code className="font-mono text-[0.9em]">POLICIES</code> array.
+          Each policy page reads its own date from there and so does this
+          screen, so the date a reader sees and the date reported here cannot
+          drift. It used to be duplicated — each page carried its own{" "}
+          <code className="font-mono text-[0.9em]">updated=</code> string and
+          this screen hard-coded one constant beside them — which meant a policy
+          revised in its own file left this page quietly reporting the old date.
+        </p>
+        <p className="mt-2">
+          The policies themselves stay in code. They are long-form prose with
+          headings, tables and cross-links between them, styled by{" "}
+          <code className="font-mono text-[0.9em]">.prose</code> and checked by
+          the same accessibility audit as every other page. A database-backed
+          editor would replace all of that with pasted HTML, and a journal&rsquo;s
+          ethics policy is the last document that should be editable without
+          review.
         </p>
       </SourceNote>
     </SettingsPage>
@@ -215,9 +251,9 @@ const STEPS = [
       "Only the prose. The breadcrumb, the section rail, the related panel and the COPE/DOAJ note come from the shared shell and should not be duplicated into the page.",
   },
   {
-    title: "Update the `updated` date on that page",
+    title: "Update reviewedAt in the POLICIES array",
     detail:
-      "It is what a reader sees, and what an indexing assessor checks. An unchanged date on a changed policy is worse than no date.",
+      "One line in src/components/layout/policy-page.tsx — the policy page and this screen both read it, so there is nowhere else to change. It is what a reader sees and what an indexing assessor checks; an unchanged date on a changed policy is worse than no date.",
   },
   {
     title: "Check the claims against the code",

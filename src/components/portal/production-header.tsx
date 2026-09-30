@@ -107,6 +107,16 @@ export function ProductionHeader({
               : "—"}
           </dd>
         </div>
+        {/* Said once, here, rather than in a standing box on each of the three
+            stage screens — where it was the same fact three times, always on,
+            and therefore read by nobody. Nothing in production leaves the
+            portal: no mail, no tracked-changes pipeline, no author link to a
+            galley. Everything is circulated from the office against the
+            reference shown above. */}
+        <div className="flex gap-1.5">
+          <dt>Files and proofs</dt>
+          <dd className="font-medium text-foreground">Circulated by hand</dd>
+        </div>
         <div className="flex gap-1.5">
           <dt>In production since</dt>
           <dd className="font-medium text-foreground">

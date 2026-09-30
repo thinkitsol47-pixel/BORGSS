@@ -68,7 +68,21 @@ const DECLARATIONS: {
   },
 ];
 
-export function WizardDeclarationsForm({ draftId }: { draftId: string }) {
+/** What the draft already holds, so the step reopens on it rather than empty. */
+export type SavedDeclarations = {
+  aiDisclosure: string | null;
+  dataAvailability: string | null;
+  /** True once this step has been completed at least once. */
+  declared: boolean;
+};
+
+export function WizardDeclarationsForm({
+  draftId,
+  saved,
+}: {
+  draftId: string;
+  saved?: SavedDeclarations | null;
+}) {
   const [state, formAction] = useFormState(saveDeclarations, initialState);
 
   if (state.status === "success") {
@@ -82,8 +96,28 @@ export function WizardDeclarationsForm({ draftId }: { draftId: string }) {
 
   const v = state.values ?? {};
 
+  /**
+   * Whether a declaration box opens ticked.
+   *
+   * After a failed submit, what the author just did wins — including
+   * *unticking* a box, which is why the echoed values are tested for presence
+   * rather than merged with the stored state. Otherwise a box they had
+   * deliberately cleared would silently re-tick itself on the next render.
+   *
+   * Only when nothing has been submitted yet does `declaredAt` stand in: a
+   * draft that has been through this step once had all five confirmed, since
+   * the action refuses to save unless every one is ticked.
+   */
+  const submitted = state.status === "error";
+  const checked = (name: string) =>
+    submitted ? v[name] === "on" : Boolean(saved?.declared);
+
   return (
     <form action={formAction} className="space-y-7" noValidate>
+      {/* The draft these answers belong to. The action re-checks that this
+          user owns it rather than trusting the value. */}
+      <input type="hidden" name="draftId" value={draftId} />
+
       {state.status === "error" && state.message && (
         <Alert tone="danger" title="Could not continue">
           {state.message}
@@ -107,7 +141,7 @@ export function WizardDeclarationsForm({ draftId }: { draftId: string }) {
                 name={d.name}
                 label={d.label}
                 description={d.description}
-                defaultChecked={v[d.name] === "on"}
+                defaultChecked={checked(d.name)}
                 className={cn(state.errors?.[d.name] && "border-danger")}
               />
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 px-1">
@@ -150,7 +184,7 @@ export function WizardDeclarationsForm({ draftId }: { draftId: string }) {
             <Textarea
               name="aiDisclosure"
               rows={3}
-              defaultValue={v.aiDisclosure}
+              defaultValue={v.aiDisclosure ?? saved?.aiDisclosure ?? ""}
               placeholder="None."
             />
           </Field>
@@ -175,7 +209,7 @@ export function WizardDeclarationsForm({ draftId }: { draftId: string }) {
             <Textarea
               name="dataAvailability"
               rows={3}
-              defaultValue={v.dataAvailability}
+              defaultValue={v.dataAvailability ?? saved?.dataAvailability ?? ""}
               placeholder="The data supporting this study are available from the corresponding author on reasonable request."
             />
           </Field>

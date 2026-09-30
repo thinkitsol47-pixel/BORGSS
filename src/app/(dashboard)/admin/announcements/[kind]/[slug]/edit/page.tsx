@@ -5,7 +5,6 @@ import { getPostBySlug } from "@/lib/api/articles";
 import { PortalPage } from "@/components/layout/portal-page";
 import { PostForm } from "@/components/portal/post-form";
 import { PostDangerZone } from "@/components/portal/post-danger-zone";
-import { Alert } from "@/components/ui";
 import type { PostKind } from "@/types";
 
 export const metadata: Metadata = { title: "Edit post" };
@@ -26,21 +25,20 @@ export default async function Page({
   return (
     <PortalPage
       title={`Edit: ${post.title}`}
-      lead="Change what this post says, when it publishes, and when it expires."
+      lead="Change what this post says, when it publishes, and when it expires. Saving updates the public page at once — and changing the web address, or the list it belongs to, breaks every link already pointing at the old one."
       breadcrumb={[{ title: "Announcements", href: "/admin/announcements" }]}
     >
-      <Alert tone="warning" title="This form does not save yet">
-        There is no database. Editing a post today means changing{" "}
-        <code className="font-mono text-[0.9em]">src/lib/api/mock-data.ts</code>{" "}
-        and deploying.
-      </Alert>
-
-      <div className="mt-8">
+      <div className="mt-2">
         <PostForm post={post} />
       </div>
 
       <div className="mt-10">
-        <PostDangerZone title={post.title} kind={post.kind} slug={post.slug} />
+        <PostDangerZone
+          id={post.id}
+          title={post.title}
+          kind={post.kind}
+          slug={post.slug}
+        />
       </div>
     </PortalPage>
   );

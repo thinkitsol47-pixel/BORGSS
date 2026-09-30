@@ -28,6 +28,12 @@ export default async function CurrentIssuePage() {
     return (
       <div className="container py-8 md:py-10">
         <Breadcrumb items={[{ label: "Issues", href: "/issues" }, { label: "Current" }]} />
+        {/* The page still needs its one heading when there is no issue to
+            name it after: `EmptyState`'s title renders an h2, so without this
+            the empty branch shipped a page with no h1 at all. */}
+        <h1 className="mt-4 font-serif text-3xl font-bold md:text-4xl">
+          Current Issue
+        </h1>
         <EmptyState
           icon={FileText}
           title="No issue published yet"

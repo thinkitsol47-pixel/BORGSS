@@ -149,13 +149,10 @@ export default async function Page({
         </ul>
       )}
 
-      <Alert tone="warning" title="Publishing is not built yet" className="mt-8">
-        The forms behind these buttons are built, but nothing they do is saved:
-        the posts are fixtures in{" "}
-        <span className="font-mono text-[0.9em]">mock-data.ts</span> and there
-        is no database behind them. Adding an announcement today still means
-        editing that file and deploying.
-      </Alert>
+      {/* "These are live" has gone from the list. It is a real warning, but it
+          belongs where someone is about to act on it — the new-post form and
+          the edit screen both carry it — not on the screen they are only
+          reading. Repeating it here taught the reader to skip both. */}
     </PortalPage>
   );
 }
@@ -197,7 +194,7 @@ function PostRow({ post }: { post: Post }) {
             <Pencil className="size-3" aria-hidden />
             Edit
           </Link>
-          <PostDeleteButton title={post.title} />
+          <PostDeleteButton id={post.id} title={post.title} />
           <Badge variant="outline" size="sm">
             {KIND_LABEL[post.kind]}
           </Badge>

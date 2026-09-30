@@ -3,7 +3,6 @@ import Link from "next/link";
 import { requireGroup } from "@/lib/auth/require-role";
 import { getJournalStats, getTurnaroundStats } from "@/lib/api/admin";
 import { PortalPage } from "@/components/layout/portal-page";
-import { Alert } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Statistics" };
@@ -37,20 +36,14 @@ export default async function Page() {
   return (
     <PortalPage
       title="Statistics"
-      lead="Counted from the manuscripts and articles this platform holds. Nothing here is estimated."
+      lead="Counted from the manuscripts and articles this platform holds — nothing here is estimated. The totals are small and mostly seeded for development, so a rate moves several points when one manuscript changes; each figure states what it is calculated over."
     >
       {/* The scale caveat comes first. Every figure below is true and almost
           every one is drawn from a sample too small to generalise from, and
           the reader needs both facts at once. */}
-      <Alert tone="info" title="A young journal, and small numbers">
-        These are real counts from real records, but there are{" "}
-        <span className="font-medium">{s.total}</span> manuscripts and{" "}
-        <span className="font-medium">{stats.published.articles}</span>{" "}
-        published articles in total. Rates computed over numbers this small move
-        several points when one manuscript changes, so treat them as a
-        description of what has happened rather than as a property of the
-        journal. Each figure below states what it is calculated over.
-      </Alert>
+      {/* The small-numbers caveat is in the lead. It is the one thing a reader
+          has to carry into every figure below, so it belongs above them all
+          rather than in a box they will learn to scroll past. */}
 
       {/* ---------------------------------------------------- submissions */}
       <section aria-labelledby="submissions-heading" className="mt-10">
@@ -201,14 +194,9 @@ export default async function Page() {
         </p>
       </section>
 
-      <Alert tone="warning" title="These figures come from fixtures" className="mt-10">
-        There is no database. The counts above are computed from the mock
-        manuscripts and articles in{" "}
-        <code className="font-mono text-[0.9em]">src/lib/api/</code>, so they
-        describe the development data rather than a live journal. The
-        calculations themselves are real and will not change when the backend
-        lands — only the numbers they run over.
-      </Alert>
+      {/* The second notice has gone. It said what the one at the top of the
+          page already says — small numbers, real arithmetic — and two boxes
+          making the same point is how a reader learns to read neither. */}
     </PortalPage>
   );
 }

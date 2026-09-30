@@ -28,7 +28,6 @@ export default function Page() {
       title="Conflict of Interest Policy"
       lead="A competing interest is not misconduct. Failing to declare one is. This policy sets out what must be disclosed, by whom, and what the journal does with the disclosure."
       toc={TOC}
-      updated="2026-01-15"
       related={["publication-ethics", "editorial-independence", "reviewer-ethics"]}
     >
       <h2 id="principle">The principle</h2>

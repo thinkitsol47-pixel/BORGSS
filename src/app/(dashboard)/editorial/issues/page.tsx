@@ -9,7 +9,7 @@ import {
 } from "@/lib/api/editorial";
 import { PortalPage } from "@/components/layout/portal-page";
 import { StatusBadge } from "@/components/portal/status-badge";
-import { Alert, Badge, EmptyState } from "@/components/ui";
+import { Badge, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { EditorialIssue, IssueState } from "@/types";
@@ -144,13 +144,12 @@ export default async function Page() {
         </section>
       )}
 
-      <div className="mt-10">
-        <Alert tone="warning" title="Issue planning is not built yet">
-          The forms and controls are built, but nothing they do is saved —
-          there is no database behind these screens. The editorial office plans
-          issues outside the system for now.
-        </Alert>
-      </div>
+      {/* No notice about publishing here. This screen has no publish control
+          and never had one, so the note answered a question nobody had asked —
+          and it sat directly beneath the "Published" section, where it read as
+          a denial of the two issues listed above it. The place that question
+          arises is an individual issue, and `[issueId]/page.tsx` carries it
+          there, shown only while the issue is not yet published. */}
     </PortalPage>
   );
 }

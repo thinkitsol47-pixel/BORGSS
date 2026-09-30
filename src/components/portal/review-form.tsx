@@ -26,7 +26,13 @@ const initialState: ReviewActionState = { status: "idle" };
 
 const AUTHOR_MIN = 200;
 
-export function ReviewForm({ reference }: { reference: string }) {
+export function ReviewForm({
+  reviewId,
+  reference,
+}: {
+  reviewId: string;
+  reference: string;
+}) {
   const [state, formAction] = useFormState(submitReview, initialState);
   const [toAuthor, setToAuthor] = useState(state.values?.commentsToAuthor ?? "");
 
@@ -45,10 +51,20 @@ export function ReviewForm({ reference }: { reference: string }) {
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
           {state.message}
         </p>
+        {/* Was "once the backend is connected, submitting marks the assignment
+            complete, notifies the handling editor…" — written before any of it
+            worked. All of it now does except the notification, which needs
+            email the journal cannot send, so that half is stated as the gap it
+            is rather than left inside a promise about the future. */}
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          Once the backend is connected, submitting marks the assignment
-          complete, notifies the handling editor, and your comments to the
-          author are held until a decision is issued.
+          Your report is saved and this assignment is marked complete. When
+          every reviewer for the round is in, the manuscript moves to the
+          editor&rsquo;s decision queue. Your comments to the author are held
+          until that decision is issued.
+        </p>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+          The handling editor is not emailed — the journal owns no domain yet —
+          so the report waits in their queue until they next open it.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button href="/reviews" variant="outline">
@@ -63,6 +79,8 @@ export function ReviewForm({ reference }: { reference: string }) {
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
+      <input type="hidden" name="reviewId" value={reviewId} />
+
       {state.status === "error" && state.message && (
         <Alert tone="danger" title="Could not submit the review">
           {state.message}

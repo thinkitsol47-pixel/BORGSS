@@ -1,6 +1,6 @@
-import { cookies } from "next/headers";
-import { ROLES, type Role } from "@/config/roles";
-import { isDemoMode } from "./demo-mode";
+import { type Role } from "@/config/roles";
+import { supabaseServer } from "./supabase";
+import { db } from "@/lib/db";
 
 export type CurrentUser = {
   id: string;
@@ -8,90 +8,161 @@ export type CurrentUser = {
   email: string;
   roles: Role[];
   orcid?: string;
-};
-
-/**
- * The default. Three roles, because a journal this size has people who are
- * author, reviewer and editor at once — which is the whole reason the portal is
- * unified rather than split per role.
- */
-const DEFAULT_ROLES: Role[] = ["author", "reviewer", "sectionEditor"];
-
-/** Set by a successful demo sign-in. Development only. */
-export const ROLE_COOKIE = "borjss_dev_role";
-
-/**
- * DEVELOPMENT ONLY — demo sign-ins, so the portal can be walked before there
- * is an auth provider. Any password is accepted; only the address is read.
- *
- * The accounts match real rows in `mock-users.ts`, so signing in as one shows
- * a person who exists elsewhere in the app rather than an invented identity.
- * `signIn` consults this only when `NODE_ENV` is not production — a build that
- * ships must not contain a login that accepts anything.
- */
-export const DEMO_ACCOUNTS: Record<string, Role> = {
-  "m.quddus@borjss.example": "superAdmin",
-  "f.mirza@borjss.example": "admin",
-  "a.rafiq@borjss.example": "journalManager",
-  "a.khan@example.edu": "sectionEditor",
-  "h.aslam@borjss.example": "copyeditor",
-  "p.raghavan@example.edu": "reviewer",
-};
-
-/** Display identity per role, so the topbar does not say "Ayesha Khan" for all. */
-const IDENTITIES: Partial<Record<Role, { name: string; email: string }>> = {
-  superAdmin: { name: "Dr. Mubashir Quddus", email: "m.quddus@borjss.example" },
-  admin: { name: "Faryal Mirza", email: "f.mirza@borjss.example" },
-  journalManager: { name: "Adnan Rafiq", email: "a.rafiq@borjss.example" },
-  copyeditor: { name: "Hina Aslam", email: "h.aslam@borjss.example" },
-  reviewer: { name: "Dr. Priya Raghavan", email: "p.raghavan@example.edu" },
-};
-
-/**
- * SCAFFOLD STUB — replace with a real session lookup (Auth.js / Supabase).
- * Returns a mock user so the portal renders during frontend build.
- */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const role = devRole();
-
-  if (role && IDENTITIES[role]) {
-    const who = IDENTITIES[role]!;
-    return {
-      id: "mock-user",
-      name: who.name,
-      email: who.email,
-      // `author` and `reviewer` ride along so "My submissions" and "My
-      // reviews" stay in the sidebar — the multi-role case is the real one.
-      roles: ["author", "reviewer", role],
-    };
-  }
-
-  return {
-    id: "mock-user",
-    name: "Dr. Ayesha Khan",
-    email: "a.khan@example.edu",
-    roles: DEFAULT_ROLES,
-    orcid: "0000-0002-1825-0097",
+  /* The account's own editable details, so /profile can prefill from the
+     database rather than showing empty fields over stored values. */
+  affiliation?: string;
+  department?: string;
+  position?: string;
+  country?: string;
+  bio?: string;
+  /** Which emails this account wants; the defaults live on the column. */
+  notifications?: {
+    submissionStatus: boolean;
+    editorialMessages: boolean;
+    newInvitations: boolean;
+    reviewReminders: boolean;
+    issuePublished: boolean;
+    journalNews: boolean;
   };
+};
+
+/**
+ * What an account with no roles falls back to.
+ *
+ * Reaching this means a `User` row exists with no `UserRole` rows — a
+ * half-created account, or one whose roles were all revoked. `author` alone is
+ * the safe answer: it lets them see their own submissions and nothing else.
+ * Anything wider would hand someone editorial access by accident.
+ */
+const DEFAULT_ROLES: Role[] = ["author"];
+
+/**
+ * Whether a thrown error is Postgres being momentarily unreachable, rather
+ * than anything about the query.
+ *
+ * Supabase's free-tier pooler drops connections — it pauses after a week idle,
+ * and it sheds transient ones besides. Prisma reports both as `P1001`.
+ */
+function isUnreachable(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: unknown }).code === "P1001"
+  );
 }
 
 /**
- * The role a demo sign-in selected, if any.
+ * Read the profile, retrying once through a brief connection drop.
  *
- * Never honoured on the production domain — see `isDemoMode()`.
+ * **Why this is retried and almost nothing else is.** `getCurrentUser()` runs
+ * on every portal render, so a single dropped connection here does not fail one
+ * query — it replaces the entire portal with a runtime error screen, for a
+ * fault that is over by the time the reader has finished reading it. One retry
+ * after a short pause converts the common case into a slightly slow page.
  *
- * `cookies()` is read **before** that check, not after, and the order is
- * load-bearing. Reading it is what marks a page dynamic; returning early would
- * let Next prerender every portal screen at build time, when no request and no
- * cookie exist — and the built HTML would then be served to everyone whatever
- * their cookie said. That is exactly what happened before this comment: a
- * preview deployment showed the demo panel but every admin route still
- * redirected, because the pages had been baked as a section editor.
+ * A genuine outage still throws, and should: signing someone in against a
+ * database nobody can reach would mean rendering a portal with no roles in it.
  */
-function devRole(): Role | null {
-  const value = cookies().get(ROLE_COOKIE)?.value;
+async function loadProfile(userId: string) {
+  const query = () =>
+    db.user.findUnique({ where: { id: userId }, include: { roles: true } });
 
-  if (!isDemoMode()) return null;
-  if (!value || !ROLES.includes(value as Role)) return null;
-  return value as Role;
+  try {
+    return await query();
+  } catch (e) {
+    if (!isUnreachable(e)) throw e;
+    await new Promise((r) => setTimeout(r, 400));
+    return query();
+  }
+}
+
+/**
+ * The signed-in account, or null.
+ *
+ * **The real session is checked first, and it wins.** Supabase Auth holds the
+ * credentials; this app's `User` table holds everything the portal renders —
+ * name, roles, affiliation, notification settings. They are joined on the id,
+ * which is why `User.id` was made the `auth.users` id back in phase 1 rather
+ * than carrying a second key.
+ *
+ * `getUser()`, not `getSession()`: the former verifies the token with Supabase,
+ * the latter trusts a cookie. Roles are read from the database on every call,
+ * never from the token — a JWT minted before someone was made an editor would
+ * otherwise keep saying they are not one until it expired.
+ *
+ * There is no other way in. The demo door — a cookie that named a role and a
+ * one-click sign-in that checked no password — was deleted once real accounts
+ * existed. Nothing here reads a cookie; the Supabase session is the only
+ * identity.
+ *
+ * The profile read goes through `loadProfile`, which retries once on a dropped
+ * connection — see the note there for why this one query earns that and the
+ * rest of the app does not.
+ */
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  const { data } = await supabaseServer().auth.getUser();
+  const authUser = data.user;
+
+  if (authUser) {
+    const row = await loadProfile(authUser.id);
+
+    // Authenticated with Supabase but no profile row. This happens if
+    // registration created the auth account and then failed before writing the
+    // profile. Returning null sends them back to /login rather than rendering a
+    // portal for a user whose name and roles are unknown.
+    if (!row) return null;
+
+    return toCurrentUser(row);
+  }
+
+  // No session. The middleware has already redirected any portal route, so
+  // reaching here is a public page asking who is signed in and being content
+  // with nobody.
+  return null;
+}
+
+/** The shape the portal renders, from the row the database holds. */
+function toCurrentUser(
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    orcid: string | null;
+    affiliation: string | null;
+    department: string | null;
+    position: string | null;
+    country: string | null;
+    bio: string | null;
+    notifySubmissionStatus: boolean;
+    notifyEditorialMessages: boolean;
+    notifyNewInvitations: boolean;
+    notifyReviewReminders: boolean;
+    notifyIssuePublished: boolean;
+    notifyJournalNews: boolean;
+    roles: { role: string }[];
+  },
+): CurrentUser {
+  const dbRoles = user.roles.map((r) => r.role) as Role[];
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    roles: dbRoles.length > 0 ? dbRoles : DEFAULT_ROLES,
+    orcid: user.orcid ?? undefined,
+    affiliation: user.affiliation ?? undefined,
+    department: user.department ?? undefined,
+    position: user.position ?? undefined,
+    country: user.country ?? undefined,
+    bio: user.bio ?? undefined,
+    notifications: {
+      submissionStatus: user.notifySubmissionStatus,
+      editorialMessages: user.notifyEditorialMessages,
+      newInvitations: user.notifyNewInvitations,
+      reviewReminders: user.notifyReviewReminders,
+      issuePublished: user.notifyIssuePublished,
+      journalNews: user.notifyJournalNews,
+    },
+  };
 }

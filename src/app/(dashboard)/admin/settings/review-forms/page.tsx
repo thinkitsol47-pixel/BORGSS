@@ -7,7 +7,6 @@ import {
   REVIEW_RECOMMENDATIONS,
   REVIEW_SCALE,
 } from "@/lib/validation/schemas";
-import { Alert } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Review Forms" };
 
@@ -157,22 +156,9 @@ export default async function Page() {
         </dl>
       </section>
 
-      <Alert tone="warning" title="Why this is not a form builder" className="mt-10">
-        <p>
-          The criteria are not merely questions; they are the axis every
-          returned report is scored on. Adding or removing one mid-life leaves
-          old reports and new ones incomparable, and an editor reading two
-          reports at a decision would be comparing different instruments without
-          being told.
-        </p>
-        <p className="mt-2">
-          A real editor therefore needs versioning before it needs a drag
-          handle: a report stores which version of the form produced it, old
-          versions stay readable, and a review already in progress finishes on
-          the form it started on. Until that exists, editing this list is a code
-          change and a deploy — which is slow, and safe.
-        </p>
-      </Alert>
+      {/* "Why this is not a form builder" has moved into the SourceNote below,
+          which already names the file to edit — one place, at the foot, rather
+          than an argument the reader meets twice. */}
 
       <SourceNote file="src/lib/validation/schemas.ts">
         <code className="font-mono text-[0.9em]">REVIEW_CRITERIA</code>,{" "}
@@ -182,6 +168,13 @@ export default async function Page() {
         in the same file validates it. The reviewer&rsquo;s form, the
         editor&rsquo;s report view and this page all render from those three
         lists, so they cannot drift apart.
+        <p className="mt-2">
+          That is why the form stays in code rather than becoming editable here:
+          a criterion is not a label but a key stored on every report ever
+          returned. Renaming one in a database would leave older reports scored
+          against a criterion nothing can name, and an editor comparing two
+          rounds would be comparing different questions.
+        </p>
       </SourceNote>
     </SettingsPage>
   );

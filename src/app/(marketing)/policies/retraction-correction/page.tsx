@@ -30,7 +30,6 @@ export default function Page() {
       title="Retraction & Correction Policy"
       lead="The published record should say what is true. When something published here turns out to be wrong, the journal corrects it openly rather than quietly — and never by making the original disappear."
       toc={TOC}
-      updated="2026-01-15"
       related={["publication-ethics", "research-integrity", "complaints-appeals"]}
     >
       <h2 id="principle">The principle</h2>

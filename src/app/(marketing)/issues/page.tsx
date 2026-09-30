@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Library, Search } from "lucide-react";
-import { getIssues, getPublishedArticles } from "@/lib/api/articles";
+import { getArticlesForIssue, getIssues } from "@/lib/api/articles";
 import { IssueCard } from "@/components/marketing/issue-toc";
 import { Breadcrumb, Button, EmptyState, Eyebrow } from "@/components/ui";
 
@@ -14,13 +14,30 @@ export const metadata: Metadata = {
 
 export default async function ArchivesPage() {
   const issues = await getIssues();
-  const articles = await getPublishedArticles();
 
-  const byId = new Map(articles.map((a) => [a.id, a]));
-  const articlesIn = (issueId: string) =>
-    (issues.find((i) => i.id === issueId)?.articleIds ?? [])
-      .map((id) => byId.get(id))
-      .filter((a): a is (typeof articles)[number] => Boolean(a));
+  /* Resolved through `getArticlesForIssue` rather than by matching ids here.
+     This page used to build that map itself from a separate
+     `getPublishedArticles()` call, and it broke silently the moment issues
+     began coming from the database while articles did not — the two id spaces
+     stopped meeting and every issue rendered an empty table of contents, with
+     no error anywhere. Knowing which articles belong to an issue is the data
+     layer's job, and it is one query per issue against an indexed column. */
+  const contents = new Map(
+    await Promise.all(
+      issues.map(
+        async (i) => [i.id, await getArticlesForIssue(i)] as const,
+      ),
+    ),
+  );
+  const articlesIn = (issueId: string) => contents.get(issueId) ?? [];
+
+  /* Counted from what the page actually lists, not from a separate query. A
+     headline figure that disagrees with the issues below it is worse than no
+     figure, and the two came from different sources before. */
+  const articleCount = [...contents.values()].reduce(
+    (n, list) => n + list.length,
+    0,
+  );
 
   // Newest volume first; issues within a volume also newest first.
   const volumes = Array.from(new Set(issues.map((i) => i.volume)))
@@ -50,7 +67,7 @@ export default async function ArchivesPage() {
           {[
             ["Volumes", volumes.length],
             ["Issues", issues.length],
-            ["Articles", articles.length],
+            ["Articles", articleCount],
           ].map(([label, value]) => (
             <div key={String(label)} className="bg-card px-4 py-3 text-center">
               <dd className="font-serif text-2xl font-bold text-brand-dark tabular-nums">

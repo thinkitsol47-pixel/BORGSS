@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { AlertCircle, Gavel, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2, Gavel } from "lucide-react";
 import {
   recordDecision,
   type DecisionState,
@@ -17,12 +17,14 @@ const initialState: DecisionState = { status: "idle" };
 const LETTER_MIN = 120;
 
 export function DecisionForm({
+  submissionId,
   reference,
   /** Only the decisions this manuscript can actually receive. */
   available,
   /** True when the current round has an assignment with no report. */
   hasMissingReports,
 }: {
+  submissionId: string;
   reference: string;
   available: DecisionType[];
   hasMissingReports: boolean;
@@ -41,6 +43,8 @@ export function DecisionForm({
 
   return (
     <form action={formAction} className="space-y-8" noValidate>
+      <input type="hidden" name="submissionId" value={submissionId} />
+
       {state.status === "error" && state.message && (
         <Alert tone="danger" title="Could not record the decision">
           {state.message}
@@ -184,7 +188,8 @@ export function DecisionForm({
       <div className="flex flex-wrap items-center gap-3 border-t pt-6">
         <Submit />
         <p className="text-xs text-muted-foreground">
-          Nothing is recorded or sent yet.
+          Recorded to the manuscript&rsquo;s history. The letter is sent from the
+          office by email.
         </p>
       </div>
     </form>
@@ -204,10 +209,11 @@ function Submit() {
 /**
  * The result screen.
  *
- * Deliberately not a green tick. An editor who records a decision and sees a
- * success state will believe the author has been written to — and on this
- * screen, unlike the review form, someone else's manuscript is waiting on the
- * outcome. So it leads with what did *not* happen.
+ * The decision IS now recorded — the status has moved and the history has the
+ * new entry. What has *not* happened is the letter reaching the author: there
+ * is no mail provider, so that still goes out from the office by hand. The
+ * screen says exactly which of the two happened, and gives the letter back so
+ * it can be copied into that email.
  */
 function DecisionOutcome({
   state,
@@ -221,37 +227,35 @@ function DecisionOutcome({
     state.decision;
 
   return (
-    <div className="rounded-xl border border-warning/30 bg-warning/5 p-6">
+    <div className="rounded-xl border border-success/30 bg-success/5 p-6">
       <span
         aria-hidden
-        className="grid size-11 place-items-center rounded-xl bg-warning/10 text-warning"
+        className="grid size-11 place-items-center rounded-xl bg-success/10 text-success"
       >
-        <Info className="size-5" />
+        <CheckCircle2 className="size-5" />
       </span>
       <h2 className="mt-3 font-serif text-lg font-semibold">
-        Checked, but not recorded
+        Decision recorded
       </h2>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        The decision — <span className="font-medium text-foreground">{label}</span>{" "}
-        — is valid and the letter meets the minimum length. Nothing was written
-        to the manuscript&rsquo;s history, the author has not been told, and the
-        reviewers have not been notified.
+        <span className="font-medium text-foreground">{label}</span> is now on
+        the manuscript&rsquo;s history and its status has moved. This cannot be
+        edited — a later decision is a new entry, not a replacement.
       </p>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        Until the backend lands, the decision has to go out from the editorial
-        office by email, quoting{" "}
-        <span className="font-medium text-foreground">{reference}</span>. Your
-        letter is repeated below so you can copy it out — leaving this page
-        loses it, because nothing here is stored.
+        <span className="font-medium text-foreground">The author has not been
+        emailed.</span>{" "}
+        There is no mail provider yet, so the letter has to go out from the
+        editorial office by hand, quoting{" "}
+        <span className="font-medium text-foreground">{reference}</span>. It is
+        repeated below to copy across. The reviewers are not notified
+        automatically either.
       </p>
 
-      {/* The letter is given back rather than discarded. This screen exists at
-          the end of an hour's writing, and "it is not saved anywhere" is only
-          fair advice if the text is still on screen to be taken. */}
       {state.values?.letter && (
         <div className="mt-5">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Your letter
+            The letter, as recorded
           </h3>
           <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg border bg-background p-3 font-sans text-sm leading-relaxed">
             {state.values.letter}

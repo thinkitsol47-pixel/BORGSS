@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText, LogIn, Mail, ScrollText, Send, UserPlus } from "lucide-react";
 import { siteConfig } from "@/config/site.config";
-import { Alert, Button, Card, Eyebrow } from "@/components/ui";
+import { Button, Card, Eyebrow } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "Submit a Manuscript",
   description:
-    "How to submit a manuscript to BORJSS while the online submission system is being built.",
+    "How to submit a manuscript to BORJSS through the online submission portal.",
 };
 
 /**
@@ -19,14 +19,14 @@ export const metadata: Metadata = {
  * own version, behind the sidebar, and this is the public one behind the site
  * header. The site header's "Submit Manuscript" button points here.
  *
- * SCAFFOLD: the submission wizard is phase 15. Rather than dropping a visitor
- * on an empty page, this tells them plainly that the online system is not
- * ready and gives the route that does work today — emailing the submissions
- * desk — alongside the option to create an account.
+ * The wizard is live: it creates a draft row, uploads files to storage and
+ * issues a real reference from a database sequence. So this page's job is now
+ * to route a visitor into it — `/login?next=/submissions/new`, which the login
+ * page supports — rather than to apologise for its absence.
  *
- * When the wizard lands and auth is real, the header button can point at
- * `/submissions/new` instead: signed in → the wizard, signed out →
- * `/login?next=/submissions/new`, which the login page already supports.
+ * Email is kept as the secondary route, not the primary one. It genuinely
+ * still works and the editorial office still reads it, but a portal
+ * submission is tracked and an emailed one is typed in by hand.
  */
 
 const PREPARE = [
@@ -62,44 +62,35 @@ export default function Page() {
           Submit a Manuscript
         </h1>
         <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
-          The journal is accepting submissions for its inaugural volume. The
-          online submission system is still being built, so submissions come to
-          the editorial office by email in the meantime.
+          The journal is accepting submissions for its inaugural volume. Submit
+          online through the author portal — you will need an account, which
+          takes a minute to create.
         </p>
       </header>
 
-      <div className="mt-8">
-        <Alert tone="info" title="Online submission is not available yet">
-          The author portal — where you would upload files, add co-authors and
-          track a manuscript through review — is in development. Until it is
-          ready, email your manuscript to the submissions desk and the editorial
-          office will handle it exactly as it would a portal submission.
-        </Alert>
-      </div>
-
-      {/* ------------------------------------------------------ how to send */}
-      <section aria-labelledby="how" className="mt-10">
-        <h2 id="how" className="font-serif text-xl font-bold">
-          How to submit today
+      {/* ------------------------------------------------------- the portal */}
+      <section aria-labelledby="portal" className="mt-10">
+        <h2 id="portal" className="font-serif text-xl font-bold">
+          Submit online
         </h2>
 
         <Card className="mt-5 p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
             <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-tint text-brand-dark">
-              <Mail className="size-5" aria-hidden />
+              <Send className="size-5" aria-hidden />
             </span>
             <div className="min-w-0 flex-1">
               <p className="font-serif text-base font-semibold">
-                Email the submissions desk
+                The submission portal
               </p>
-              <a
-                href={`mailto:${siteConfig.contact.submissions}`}
-                className="mt-1 block break-all font-medium text-primary hover:text-brand-dark hover:underline"
-              >
-                {siteConfig.contact.submissions}
-              </a>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                A six-step form: article type and title, your files, the
+                metadata, your co-authors in order, the declarations, then a
+                summary to check before you send it. Each step is saved as you
+                go, so you can leave and come back.
+              </p>
 
-              <p className="mt-4 text-sm font-medium">Attach:</p>
+              <p className="mt-4 text-sm font-medium">You will need:</p>
               <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
                 <li className="flex gap-2">
                   <span aria-hidden className="text-brand">
@@ -140,9 +131,54 @@ export default function Page() {
               </ul>
 
               <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                You will receive an acknowledgement with a manuscript ID within
-                two working days. Quote that ID in any correspondence about the
-                submission.
+                Your manuscript is given a reference as soon as it is submitted,
+                and you can follow it through review in the portal. Quote that
+                reference in any correspondence about the submission.
+              </p>
+
+              <Button href="/login?next=/submissions/new" className="mt-5">
+                <Send className="size-4" aria-hidden />
+                Start a submission
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      {/* ------------------------------------------------------ how to send */}
+      <section aria-labelledby="how" className="mt-12">
+        <h2 id="how" className="font-serif text-xl font-bold">
+          Or submit by email
+        </h2>
+        <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          If you would rather not use the portal, the editorial office still
+          accepts submissions by email. A portal submission is tracked
+          automatically; an emailed one is entered by hand, so it takes longer
+          to acknowledge.
+        </p>
+
+        <Card className="mt-5 p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-tint text-brand-dark">
+              <Mail className="size-5" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-serif text-base font-semibold">
+                Email the submissions desk
+              </p>
+              <a
+                href={`mailto:${siteConfig.contact.submissions}`}
+                className="mt-1 block break-all font-medium text-primary hover:text-brand-dark hover:underline"
+              >
+                {siteConfig.contact.submissions}
+              </a>
+
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                Attach the same four items the portal asks for — the anonymised
+                manuscript, a separate title page, your declarations, and any
+                figures or supplementary files. You will receive an
+                acknowledgement with a manuscript reference within two working
+                days.
               </p>
 
               <Button
@@ -163,10 +199,9 @@ export default function Page() {
           About accounts
         </h2>
         <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Once the portal opens, submitting will need an account — it is what
-          links a manuscript to you, lets you track it through review, and
-          carries the decision back. You do not need one to email a submission
-          today, and registering now does not create a queue place.
+          Submitting through the portal needs an account — it is what links a
+          manuscript to you, lets you track it through review, and carries the
+          decision back. You do not need one to email a submission.
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -181,8 +216,9 @@ export default function Page() {
         </div>
 
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Registration validates your details but does not create an account
-          yet — the account system is still being built.
+          Email addresses are not verified yet, so if you forget your password
+          the reset link may not reach you. Contact the editorial office if you
+          are locked out.
         </p>
       </section>
 

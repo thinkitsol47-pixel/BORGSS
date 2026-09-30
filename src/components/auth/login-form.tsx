@@ -1,58 +1,47 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useFormState } from "react-dom";
-import { LogIn, Mail, ShieldCheck } from "lucide-react";
-import {
-  signIn,
-  signInAsDemoAdmin,
-  type AuthState,
-} from "@/app/(auth)/actions";
+import { LogIn, Mail } from "lucide-react";
+import { signIn, type AuthState } from "@/app/(auth)/actions";
 import { Alert, CheckOption, Field, Input } from "@/components/ui";
-import {
-  AuthHeading,
-  PasswordField,
-  ScaffoldNotice,
-  SubmitButton,
-} from "./auth-parts";
+import { AuthHeading, PasswordField, SubmitButton } from "./auth-parts";
 
 const initialState: AuthState = { status: "idle" };
 
-export function LoginForm({
-  next,
-  /* Passed in from the page: this is a client component and cannot read the
-     server's environment, so the decision is made once on the server and the
-     answer travels here. */
-  demoMode = false,
-}: {
-  next?: string;
-  demoMode?: boolean;
-}) {
+export function LoginForm({ next }: { next?: string }) {
   const [state, formAction] = useFormState(signIn, initialState);
+  const router = useRouter();
   const v = state.values ?? {};
+
+  /**
+   * Navigate once the session cookie has actually arrived.
+   *
+   * The action returns `redirectTo` instead of calling `redirect()`, because a
+   * redirect thrown inside the action aborts it before Supabase's
+   * `Set-Cookie` is flushed — the browser then reaches the portal with no
+   * session and the middleware sends it straight back here, blanking the
+   * form. By the time this effect runs the response (and its cookie) has been
+   * received, so the navigation lands signed in.
+   *
+   * `replace`, not `push`: the Back button should not return to a sign-in
+   * form the visitor has already completed. `refresh()` discards the router
+   * cache, which still holds the signed-out render of the portal shell.
+   */
+  useEffect(() => {
+    if (state.status === "success" && state.redirectTo) {
+      router.replace(state.redirectTo);
+      router.refresh();
+    }
+  }, [state.status, state.redirectTo, router]);
 
   return (
     <>
       <AuthHeading title="Sign in">
         Access your submissions, reviews and editorial work.
       </AuthHeading>
-
-      <ScaffoldNotice>
-        The account system is still being built, so sign-in authenticates
-        nobody.{" "}
-        {demoMode
-          ? "The demo entry below opens the portal; a real address and password will not work until the backend lands."
-          : "No credentials will work until the backend lands."}
-      </ScaffoldNotice>
-
-      {/* The same guard the sign-in action uses, so these panels and the
-          accounts they list appear and disappear together. */}
-      {demoMode && (
-        <>
-          <DemoAdminEntry />
-          <DemoAccounts />
-        </>
-      )}
 
       <form action={formAction} className="space-y-5" noValidate>
         {next && <input type="hidden" name="next" value={next} />}
@@ -119,108 +108,5 @@ export function LoginForm({
         </Link>
       </p>
     </>
-  );
-}
-
-/**
- * One-click entry to the portal as a super administrator.
- *
- * Deliberately credential-free. A demo password guards nothing — it has to be
- * handed to whoever is being shown the portal, so it is not a secret, and all
- * it adds is a step to mistype. What actually closes this door is
- * `isDemoMode()`: unset BORJSS_DEMO and both this button and the action behind
- * it are gone, with no code change.
- *
- * Super administrator because it is the only role that reaches every screen —
- * `audit.view` and `platform.manage` are withheld even from `admin`, so a
- * demo signed in as anything less would hit a redirect while being walked
- * through the portal. The panel below still lists the narrower roles, since
- * seeing what each role *cannot* reach is the other half of the demo.
- */
-function DemoAdminEntry() {
-  return (
-    <form action={signInAsDemoAdmin} className="mb-6">
-      <div className="rounded-lg border border-brand-border bg-brand-tint/40 p-4">
-        <p className="text-sm font-semibold text-brand-darker">
-          Open the portal without signing in
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Enters as a super administrator, which reaches every screen. No
-          password is needed — nothing is being authenticated.
-        </p>
-        <div className="mt-3.5">
-          <SubmitButton pendingLabel="Opening the portal…">
-            <ShieldCheck className="size-4" aria-hidden />
-            Enter as super administrator
-          </SubmitButton>
-        </div>
-      </div>
-    </form>
-  );
-}
-
-/**
- * The demo sign-ins, listed rather than hidden in a README.
- *
- * Six roles chosen to cover what the portal actually differentiates: the two
- * administrator tiers (a super admin sees the audit log and integrations, an
- * ordinary admin does not — that difference is the point of the roles screen),
- * a journal manager, the default editor, a production role, and a plain
- * reviewer. Any password is accepted; only the address is read.
- */
-function DemoAccounts() {
-  const accounts: { email: string; label: string; note: string }[] = [
-    {
-      email: "m.quddus@borjss.example",
-      label: "Super administrator",
-      note: "Everything, including the audit log and integrations",
-    },
-    {
-      email: "f.mirza@borjss.example",
-      label: "Administrator",
-      note: "Everything except the four platform permissions",
-    },
-    {
-      email: "a.rafiq@borjss.example",
-      label: "Journal manager",
-      note: "Issues, production, users, settings, DOI",
-    },
-    {
-      email: "a.khan@example.edu",
-      label: "Section editor",
-      note: "The queue, reviewers and decisions",
-    },
-    {
-      email: "h.aslam@borjss.example",
-      label: "Copyeditor",
-      note: "Production only",
-    },
-    {
-      email: "p.raghavan@example.edu",
-      label: "Reviewer",
-      note: "Review invitations and reports",
-    },
-  ];
-
-  return (
-    <details className="mb-6 rounded-lg border border-brand-border bg-brand-tint/30 p-3.5">
-      <summary className="cursor-pointer text-xs font-semibold text-brand-darker">
-        Demo accounts
-      </summary>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-        Enter one of these addresses with any password. Every account is a real
-        row in the user directory. This panel is not shown on the live site.
-      </p>
-      <ul className="mt-2.5 space-y-2">
-        {accounts.map((a) => (
-          <li key={a.email}>
-            <p className="break-all font-mono text-xs font-medium">{a.email}</p>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {a.label} — {a.note}
-            </p>
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }

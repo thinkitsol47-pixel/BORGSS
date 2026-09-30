@@ -31,7 +31,6 @@ export default function Page() {
       title="Complaints & Appeals Policy"
       lead="Editors make mistakes, and processes go wrong. This policy sets out how to challenge a decision, how to complain about how you were treated, and what the journal will do about it."
       toc={TOC}
-      updated="2026-01-15"
       related={["peer-review", "publication-ethics", "editorial-independence"]}
     >
       <h2 id="scope">What this policy covers</h2>

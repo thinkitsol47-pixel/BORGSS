@@ -32,16 +32,47 @@ export function AuthHeading({
 }
 
 /**
- * Standing notice that the account system is not live.
+ * A standing notice on an auth screen.
  *
- * Every auth page carries this. The forms validate but authenticate nobody,
- * and saying so plainly is better than letting someone conclude their
- * credentials were wrong. Remove all five when the backend lands.
+ * **The heading is a prop, and that is the fix for a real bug.** It used to be
+ * hard-coded to "Not live yet", written when nothing authenticated anyone. Once
+ * sign-in became real the wording inside changed but the heading did not, so the
+ * login page announced "Not live yet" above a form that works — exactly the
+ * failure CLAUDE.md forbids, and the one a reader trusts least once they notice
+ * it.
+ *
+ * Each remaining use now says what is actually true of that screen. Where
+ * nothing is outstanding, the notice is gone rather than reworded.
  */
-export function ScaffoldNotice({ children }: { children: React.ReactNode }) {
+export function ScaffoldNotice({
+  title = "Not live yet",
+  tone = "warning",
+  children,
+}: {
+  title?: string;
+  /** `info` for something that works with a caveat; `warning` for something that does not. */
+  tone?: "warning" | "info";
+  children: React.ReactNode;
+}) {
+  const warning = tone === "warning";
+
   return (
-    <div className="mb-6 rounded-lg border border-warning/30 bg-warning/5 p-3.5">
-      <p className="text-xs font-semibold text-warning">Not live yet</p>
+    <div
+      className={
+        warning
+          ? "mb-6 rounded-lg border border-warning/30 bg-warning/5 p-3.5"
+          : "mb-6 rounded-lg border border-brand-border bg-brand-tint/40 p-3.5"
+      }
+    >
+      <p
+        className={
+          warning
+            ? "text-xs font-semibold text-warning"
+            : "text-xs font-semibold text-brand-darker"
+        }
+      >
+        {title}
+      </p>
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
         {children}
       </p>

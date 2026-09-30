@@ -221,6 +221,17 @@ export interface SubmissionFile {
   uploadedAt: string;
   /** Which round of revision this file belongs to; 0 is the original. */
   round: number;
+  /**
+   * Whether real bytes exist behind this row, so a screen can render a
+   * download link rather than a dead one. The seeded fixtures carry
+   * placeholder paths from before file storage existed.
+   *
+   * **Deliberately not the storage path itself.** The `publicId` has no
+   * business in a rendered page: downloads go through `/files/<id>`, which
+   * checks entitlement first, and a component holding a storage identifier is
+   * a component that could one day build a URL from it.
+   */
+  stored: boolean;
 }
 
 /** One editorial decision, kept as history rather than overwritten. */
@@ -267,7 +278,18 @@ export interface ReviewAssignment {
   respondedAt?: string;
   dueAt?: string;
   completedAt?: string;
-  status: "invited" | "accepted" | "declined" | "completed" | "overdue";
+  /**
+   * `overdue` is derived (accepted + past `dueAt`), never stored. `withdrawn`
+   * is stored — an editor pulled the invitation, and the row stays so the next
+   * editor sees the reviewer was approached.
+   */
+  status:
+    | "invited"
+    | "accepted"
+    | "declined"
+    | "completed"
+    | "overdue"
+    | "withdrawn";
   round: number;
 }
 
@@ -389,8 +411,18 @@ export interface ReviewTask {
 
   /** Word count of the anonymised manuscript, so the reviewer can judge effort. */
   wordCount?: number;
-  /** Filenames the reviewer may open — never the title page. */
-  files: { id: string; filename: string; sizeBytes: number }[];
+  /**
+   * Files the reviewer may open — never the title page or the cover letter,
+   * both of which name the authors. Filtered in `lib/api/reviews.ts` and
+   * refused again by `lib/storage/entitlement.ts`.
+   */
+  files: {
+    id: string;
+    filename: string;
+    sizeBytes: number;
+    /** Whether real bytes exist; see `SubmissionFile.stored`. */
+    stored: boolean;
+  }[];
   /** The handling editor's note accompanying the invitation. */
   invitationNote?: string;
 }
@@ -418,6 +450,8 @@ export type ReviewerAvailability = "available" | "unavailable" | "overloaded";
 
 export interface ReviewerProfile {
   id: string;
+  /** The `User` id behind this pool entry — what a `ReviewAssignment` points at. */
+  userId: string;
   name: string;
   email: string;
   affiliation: string;
@@ -616,6 +650,15 @@ export interface ProductionGalley {
   format: GalleyFormat;
   label: string;
   filename: string;
+  /**
+   * The Cloudinary `publicId`, and only that — never a URL, for the same
+   * reason `SubmissionFile.storagePath` is not one. Carried so a screen can
+   * ask `isStoredFile()` whether there is really a file behind the row: the
+   * seeded galleys predate storage and would otherwise render a download that
+   * 404s. The id opens nothing on its own; reads go through
+   * `/files/galley:<id>`, which checks entitlement first.
+   */
+  storagePath: string;
   sizeBytes: number;
   createdAt: string;
   /** Version, from 1. A galley is regenerated after every proof correction. */

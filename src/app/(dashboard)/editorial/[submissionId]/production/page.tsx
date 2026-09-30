@@ -10,7 +10,7 @@ import {
   waitingOn,
 } from "@/lib/api/editorial";
 import { EditorialHeader } from "@/components/portal/editorial-header";
-import { Alert, Badge, EmptyState } from "@/components/ui";
+import { Badge, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import type { Submission } from "@/types";
@@ -257,7 +257,8 @@ export default async function Page({
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   The accepted version and everything submitted alongside it.
-                  There is no file storage yet, so none of these can be opened.
+                  Downloads are not wired into this screen yet — open them from
+                  the manuscript&rsquo;s own page.
                 </p>
                 <ul className="mt-3 divide-y rounded-xl border">
                   {submission.files.map((f) => (
@@ -284,14 +285,10 @@ export default async function Page({
               </section>
             )}
 
-            <Alert tone="warning" title="Production is not built yet">
-              Nothing on this screen can be changed: no stage can be advanced,
-              no manuscript scheduled into an issue, and no file opened. The
-              copyediting, galley and proofreading workspaces are the next phase
-              of work. Production is coordinated by email in the meantime,
-              quoting <span className="font-medium">{submission.reference}</span>
-              .
-            </Alert>
+            {/* No notice. This is the editor's *view* of production — nothing
+                is done from here, so there is nothing to warn about before
+                doing it. The email limit is stated on each production screen,
+                where someone is about to send something. */}
           </>
         )}
       </div>

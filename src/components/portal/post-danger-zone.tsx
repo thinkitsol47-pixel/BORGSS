@@ -1,9 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useFormState, useFormStatus } from "react-dom";
 import { CalendarX, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui";
+import {
+  deletePost,
+  expirePost,
+  type DeleteState,
+} from "@/app/(dashboard)/admin/announcements/actions";
+import { Alert, Button } from "@/components/ui";
 import type { PostKind } from "@/types";
 
 const PUBLIC_PATH: Record<PostKind, string> = {
@@ -24,18 +31,40 @@ const PUBLIC_PATH: Record<PostKind, string> = {
  * Deletion is still offered — unlike an account, a post owns nothing and is
  * not part of the scholarly record — but it says what it costs.
  *
- * UI ONLY. Nothing happens; there is no database.
+ * **Both write.** Deletion navigates away, because the page being edited no
+ * longer exists; expiry stays put and says so, because the post is still there
+ * and the editor may want to look at it. A failure is reported where the
+ * button is rather than as an alert, so it survives being read.
  */
+
+const initialState: DeleteState = { ok: true };
+
 export function PostDangerZone({
+  id,
   title,
   kind,
   slug,
 }: {
+  id: string;
   title: string;
   kind: PostKind;
   slug: string;
 }) {
+  const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+
+  const [expireState, expireAction] = useFormState(expirePost, initialState);
+  const [deleteState, deleteAction] = useFormState(deletePost, initialState);
+
+  /* The post is gone, so the screen editing it has to go too. Done in an
+     effect rather than a `redirect()` inside the action: the action returns a
+     result the form can render on failure, and a redirect would throw past it. */
+  const deleted = deleteState.ok && deleteState !== initialState;
+  useEffect(() => {
+    if (deleted) router.push("/admin/announcements");
+  }, [deleted, router]);
+
+  const expired = expireState.ok && expireState !== initialState;
 
   return (
     <section aria-labelledby="danger-heading">
@@ -52,17 +81,31 @@ export function PostDangerZone({
           not break. This is the right answer for a call for papers that has
           closed.
         </p>
-        <div className="mt-4">
-          <Button
-            variant="outline"
-            onClick={() =>
-              alert("Nothing changed — there is no database yet.")
-            }
-          >
-            <CalendarX className="size-4" aria-hidden />
-            Expire today
-          </Button>
-        </div>
+
+        {expired ? (
+          <Alert tone="success" title="Expired" className="mt-4">
+            It has come off{" "}
+            <Link
+              href={PUBLIC_PATH[kind]}
+              className="font-medium text-primary hover:underline"
+            >
+              the public list
+            </Link>
+            . Its own page still works, so nothing linking to it is broken.
+          </Alert>
+        ) : (
+          <>
+            {!expireState.ok && expireState.error && (
+              <Alert tone="danger" title="Not expired" className="mt-4">
+                {expireState.error}
+              </Alert>
+            )}
+            <form action={expireAction} className="mt-4">
+              <input type="hidden" name="id" value={id} />
+              <ExpireButton />
+            </form>
+          </>
+        )}
       </div>
 
       {/* -------------------------------------------------------- delete */}
@@ -80,6 +123,12 @@ export function PostDangerZone({
           expiring it instead.
         </p>
 
+        {!deleteState.ok && deleteState.error && (
+          <Alert tone="danger" title="Not deleted" className="mt-4">
+            {deleteState.error}
+          </Alert>
+        )}
+
         {!confirming ? (
           <div className="mt-4">
             <Button variant="danger" onClick={() => setConfirming(true)}>
@@ -92,22 +141,35 @@ export function PostDangerZone({
             <p className="text-sm font-medium">
               Delete &ldquo;{title}&rdquo;? This cannot be undone.
             </p>
-            <div className="mt-3 flex flex-wrap gap-3">
-              <Button
-                variant="danger"
-                onClick={() =>
-                  alert("Nothing was deleted — there is no database yet.")
-                }
-              >
-                Yes, delete it
-              </Button>
+            <form action={deleteAction} className="mt-3 flex flex-wrap gap-3">
+              <input type="hidden" name="id" value={id} />
+              <DeleteButton />
               <Button variant="outline" onClick={() => setConfirming(false)}>
                 Cancel
               </Button>
-            </div>
+            </form>
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function ExpireButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="outline" disabled={pending}>
+      <CalendarX className="size-4" aria-hidden />
+      {pending ? "Expiring…" : "Expire today"}
+    </Button>
+  );
+}
+
+function DeleteButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="danger" disabled={pending}>
+      {pending ? "Deleting…" : "Yes, delete it"}
+    </Button>
   );
 }

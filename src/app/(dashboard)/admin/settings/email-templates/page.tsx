@@ -3,18 +3,20 @@ import Link from "next/link";
 import { requireGroup } from "@/lib/auth/require-role";
 import { SettingsPage, SourceNote } from "@/components/layout/settings-page";
 import { siteConfig } from "@/config/site.config";
-import { Alert } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Email Templates" };
 
 /**
- * The mail the platform would send, if it could send mail.
+ * Every message the platform has promised, and which of them exist.
  *
- * Nothing here exists in code: there is no mail provider, no template file and
- * no send. This screen is therefore a **specification**, like the audit log,
- * and it says so at the top rather than rendering empty template editors that
- * would look like a feature waiting for content.
+ * **Half specification, half register.** `src/lib/email/templates.ts` holds
+ * seven written templates and `sendEmail` is called from four places, so the
+ * blanket "nothing here exists in code" this file used to open with is wrong —
+ * as was the "Not built" chip on all fifteen rows and the hand-counted "six of
+ * the fifteen" near the bottom. Each row now carries its own `written` flag and
+ * the counts derive from it, so the next template to land updates the page by
+ * being marked rather than by someone remembering three sentences.
  *
  * What it can do usefully is enumerate every message the portal has promised
  * elsewhere. Each `TODO(backend)` in the codebase that says "email the author"
@@ -32,6 +34,16 @@ type Trigger = {
   href?: string;
   /** True when nothing at all happens today, not even a manual workaround. */
   critical?: boolean;
+  /**
+   * True when a function for it exists in `src/lib/email/templates.ts` and
+   * something calls it.
+   *
+   * Marked per message rather than counted in a sentence: "six of fifteen" was
+   * written by hand here and was already wrong by one when the seventh landed.
+   * A flag on the row is checked by whoever adds the template, in the file they
+   * are already editing.
+   */
+  written?: boolean;
 };
 
 const TRIGGERS: { group: string; items: Trigger[] }[] = [
@@ -42,7 +54,12 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Verify your email address",
         when: "An account is registered.",
         to: "The new account holder",
-        promisedBy: "Registration, and the verify-email screen",
+        // `welcomeEmail` is written and registration sends it, but it welcomes
+        // rather than verifies — registration sets `email_confirm: true`
+        // because a confirmation link could not be delivered. The verification
+        // message itself is still unwritten, so this row stays unmarked and
+        // critical: without it, nobody's address is ever confirmed.
+        promisedBy: "Registration sends a welcome; nothing verifies an address",
         href: "/register",
         critical: true,
       },
@@ -58,6 +75,9 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "You have been invited",
         when: "An administrator creates an account for someone.",
         to: "The invited person",
+        // `accountInviteEmail` exists in templates.ts but nothing calls it —
+        // creating an account is itself blocked on the domain. Written, not
+        // sending; the template is ready for the day the screen is.
         promisedBy: "Users screen — an account sits at status “invited”",
         href: "/admin/users",
         critical: true,
@@ -71,8 +91,9 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Submission received",
         when: "A manuscript is submitted through the wizard.",
         to: "The corresponding author",
-        promisedBy: "Wizard step 6, which currently says no receipt is sent",
+        promisedBy: "Wizard step 6 — sent, but not delivered without a domain",
         href: "/submissions/new",
+        written: true,
       },
       {
         name: "Revision requested",
@@ -151,17 +172,20 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Contact form received",
         when: "Someone submits the public contact form.",
         to: "The editorial office, and an acknowledgement to the sender",
-        promisedBy: "Contact form — validates but does not send",
+        // Both halves are written and both are sent. Not `critical`: the queue
+        // at /admin/messages is the record, and the office works it whether or
+        // not the notification was delivered.
+        promisedBy: "Contact form — sends both messages",
         href: "/contact",
-        critical: true,
+        written: true,
       },
       {
         name: "Reviewer application received",
         when: "Someone applies to join the reviewer pool.",
         to: "The editorial office, and an acknowledgement to the applicant",
-        promisedBy: "Become a reviewer — validates but does not send",
+        promisedBy: "Become a reviewer — sends both messages",
         href: "/for-reviewers/become-a-reviewer",
-        critical: true,
+        written: true,
       },
     ],
   },
@@ -172,28 +196,26 @@ export default async function Page() {
 
   const all = TRIGGERS.flatMap((g) => g.items);
   const critical = all.filter((t) => t.critical);
+  /* Counted from the rows, not written into the sentence — the hand-written
+     "six of the fifteen" further down this page was already out of date.
+
+     Note this counts *messages*, not template functions. `templates.ts` exports
+     seven functions, but the contact form and the reviewer application each
+     send a pair (a receipt to the person, a notification to the office), which
+     is one row here. Counting functions would report a larger number than the
+     list on screen can account for. */
+  const written = all.filter((t) => t.written).length;
 
   return (
     <SettingsPage
       active="email-templates"
       title="Email templates"
-      lead="Every message this platform has promised to send, and what happens instead today."
+      lead="Every message this platform has promised to send, and which of them exist. Resend is connected, but with no domain it accepts mail only for the account owner's own address — so an author gets no receipt, an invited reviewer is never told, and a password reset cannot be delivered."
     >
-      <Alert tone="warning" title="No template exists, and nothing is sent">
-        <p>
-          There is no mail provider connected and no template file anywhere in
-          the codebase. This screen is a specification of the{" "}
-          <span className="font-medium">{all.length}</span> messages the portal
-          has promised elsewhere — every{" "}
-          <code className="font-mono text-[0.9em]">TODO(backend)</code> that
-          says &ldquo;email the author&rdquo; is a template that has to exist.
-        </p>
-        <p className="mt-2">
-          Gathering them here is the point: otherwise the list is discovered one
-          screen at a time, and the one that gets forgotten is the one nobody
-          was looking at.
-        </p>
-      </Alert>
+      {/* No standing box. Each row now carries its own Written / Not built
+          chip, which says the same thing per message and in the place the
+          reader is already looking; the SourceNote at the foot carries the
+          delivery limit. */}
 
       {/* The ones with no workaround at all come next — the rest can at least
           be done by hand from the editorial office. */}
@@ -250,8 +272,18 @@ export default async function Page() {
                       {t.when}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full border border-border-strong bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                    Not built
+                  {/* Per row, not one label for all fifteen: seven of these
+                      are written, and a blanket "Not built" made the screen
+                      deny work that had already been done. */}
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium",
+                      t.written
+                        ? "border-success/30 bg-success/10 text-success"
+                        : "border-border-strong bg-background text-muted-foreground",
+                    )}
+                  >
+                    {t.written ? "Written" : "Not built"}
                   </span>
                 </div>
 
@@ -303,20 +335,29 @@ export default async function Page() {
         </dl>
       </section>
 
-      <SourceNote file="No file — nothing exists yet">
+      <SourceNote file="src/lib/email/templates.ts">
         <p>
-          Unlike every other settings screen, this one documents something that
-          has not been written. When a mail provider is connected, the templates
-          belong beside the Server Actions that trigger them, and this screen
-          becomes their index.
+          {written} of the {all.length} are written — the ones whose trigger
+          exists in the code. A template with no caller is a promise the app
+          cannot keep, so the rest arrive with the features that send them.
         </p>
         <p className="mt-2">
-          All correspondence goes out by hand from{" "}
+          <span className="font-medium">
+            They are code, not content, and stay that way.
+          </span>{" "}
+          Each is a function taking typed arguments — a reference number, a due
+          date — and a database-backed editor would turn a mistyped placeholder
+          into an email that goes out with a blank where the manuscript number
+          should be. Changing wording is a one-line edit reviewed like any other.
+        </p>
+        <p className="mt-2">
+          Delivery is the real limit: with no verified domain, Resend accepts
+          mail only for the account owner&rsquo;s own address. Correspondence to
+          authors and reviewers still goes out by hand from{" "}
           <span className="font-medium">
             {siteConfig.contact.editorialOffice}
-          </span>{" "}
-          in the meantime — which is what every &ldquo;not built yet&rdquo;
-          notice in the portal already tells its reader.{" "}
+          </span>
+          .{" "}
           <Link
             href="/admin/integrations"
             className="font-medium text-primary hover:underline"

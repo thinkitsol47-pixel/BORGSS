@@ -80,6 +80,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 486_000,
         uploadedAt: "2026-03-14",
         round: 0,
+        stored: false,
       },
       {
         id: "f2",
@@ -88,6 +89,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 32_000,
         uploadedAt: "2026-03-14",
         round: 0,
+        stored: false,
       },
       {
         id: "f3",
@@ -96,6 +98,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 71_000,
         uploadedAt: "2026-03-14",
         round: 0,
+        stored: false,
       },
       {
         id: "f4",
@@ -104,6 +107,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 512_000,
         uploadedAt: "2026-06-28",
         round: 1,
+        stored: false,
       },
       {
         id: "f5",
@@ -112,6 +116,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 104_000,
         uploadedAt: "2026-06-28",
         round: 1,
+        stored: false,
       },
     ],
     decisions: [
@@ -258,6 +263,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 604_000,
         uploadedAt: "2026-06-02",
         round: 0,
+        stored: false,
       },
       {
         id: "f2",
@@ -266,6 +272,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 28_000,
         uploadedAt: "2026-06-02",
         round: 0,
+        stored: false,
       },
       {
         id: "f3",
@@ -274,6 +281,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 156_000,
         uploadedAt: "2026-06-02",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [],
@@ -370,6 +378,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 398_000,
         uploadedAt: "2026-08-28",
         round: 0,
+        stored: false,
       },
       {
         id: "f2",
@@ -378,6 +387,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 30_000,
         uploadedAt: "2026-08-28",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [],
@@ -441,6 +451,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 212_000,
         uploadedAt: "2026-01-22",
         round: 0,
+        stored: false,
       },
       {
         id: "f2",
@@ -449,6 +460,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 26_000,
         uploadedAt: "2026-01-22",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [
@@ -526,6 +538,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 442_000,
         uploadedAt: "2025-09-11",
         round: 0,
+        stored: false,
       },
       {
         id: "f2",
@@ -534,6 +547,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 29_000,
         uploadedAt: "2025-09-11",
         round: 0,
+        stored: false,
       },
       {
         id: "f3",
@@ -542,6 +556,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 468_000,
         uploadedAt: "2026-01-08",
         round: 1,
+        stored: false,
       },
       {
         id: "f4",
@@ -550,6 +565,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 88_000,
         uploadedAt: "2026-01-08",
         round: 1,
+        stored: false,
       },
     ],
     decisions: [
@@ -659,6 +675,7 @@ export const mockSubmissions: Submission[] = [
         sizeBytes: 356_000,
         uploadedAt: "2026-02-18",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [],

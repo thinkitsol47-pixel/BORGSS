@@ -4,7 +4,7 @@ import { requireGroup } from "@/lib/auth/require-role";
 import { SettingsPage, SourceNote } from "@/components/layout/settings-page";
 import { JournalSettingsForm } from "@/components/portal/journal-settings-form";
 import { siteConfig } from "@/config/site.config";
-import { hasCrossrefPrefix } from "@/lib/api/editorial";
+import { getJournalSettings, hasRealDoiPrefix } from "@/lib/api/journal-settings";
 import { Alert } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Journal Settings" };
@@ -12,31 +12,37 @@ export const metadata: Metadata = { title: "Journal Settings" };
 /**
  * The journal's own identity.
  *
- * Rendered as a form, seeded from `siteConfig`. Saving does nothing — these
- * values are in a source file and a deployed app cannot write its own source —
- * so the form is the interface a settings table will attach to.
+ * **Twelve fields save to `JournalSetting`; nine render read-only.** The
+ * editable ones are the facts a journal acquires — an ISSN, a Crossref prefix,
+ * an office address — which an administrator should be able to record without
+ * a deploy. The rest are decisions rather than settings and stay in
+ * `site.config.ts`; see the form component for the reasoning.
+ *
+ * The config file remains the default and a stored row is an override, so a
+ * fresh database renders exactly as the file says.
  *
  * What makes this screen worth having rather than a link to the file is the
- * **unset** values, called out above the form: no ISSN, no phone, no
- * socials, a placeholder DOI prefix and an address with a literal `[city]` in
- * it. Those are the fields that block an indexing application, and they are
- * invisible in a config file until someone goes looking.
+ * **unset** values, called out above the form. Those are the fields that block
+ * an indexing application, and they are invisible in a config file until
+ * someone goes looking.
  */
 export default async function Page() {
   await requireGroup("adminOnly");
 
   const c = siteConfig;
-  const crossref = hasCrossrefPrefix();
+  // The stored values, falling back to the config file for anything unset.
+  const s = await getJournalSettings();
+  const crossref = await hasRealDoiPrefix();
 
   // Counted rather than listed by hand, so this cannot say "3 outstanding"
   // while showing four.
   const unset = [
-    !c.issn && "ISSN (print)",
-    !c.eIssn && "e-ISSN",
+    !s.issn && "ISSN (print)",
+    !s.eIssn && "e-ISSN",
     !crossref && "Crossref DOI prefix",
-    c.contact.address.includes("[") && "Editorial office address",
-    !c.contact.phone && "Telephone",
-    !c.socials.x && !c.socials.linkedin && !c.socials.facebook && "Social accounts",
+    s.address.includes("[") && "Editorial office address",
+    !s.phone && "Telephone",
+    !s.x && !s.linkedin && !s.facebook && "Social accounts",
   ].filter(Boolean) as string[];
 
   return (
@@ -60,10 +66,7 @@ export default async function Page() {
           </p>
           <p className="mt-2">
             The first three block a DOAJ application. The fields for them are
-            below, but saving does not store anything yet — until it does, set
-            them in{" "}
-            <code className="font-mono text-[0.9em]">src/config/site.config.ts</code>{" "}
-            and the whole site picks them up.
+            below, and saving stores them — the whole site picks them up.
           </p>
         </Alert>
       )}
@@ -80,18 +83,18 @@ export default async function Page() {
             frequency: c.frequency,
             language: c.language,
             accessModel: c.accessModel,
-            issn: c.issn,
-            eIssn: c.eIssn,
-            doiPrefix: c.doiPrefix,
-            editorialOffice: c.contact.editorialOffice,
-            submissions: c.contact.submissions,
-            support: c.contact.support,
-            charges: c.contact.charges,
-            address: c.contact.address,
-            phone: c.contact.phone,
-            x: c.socials.x,
-            linkedin: c.socials.linkedin,
-            facebook: c.socials.facebook,
+            issn: s.issn,
+            eIssn: s.eIssn,
+            doiPrefix: s.doiPrefix,
+            editorialOffice: s.editorialOffice,
+            submissions: s.submissions,
+            support: s.support,
+            charges: s.charges,
+            address: s.address,
+            phone: s.phone,
+            x: s.x,
+            linkedin: s.linkedin,
+            facebook: s.facebook,
           }}
         />
       </div>
@@ -107,13 +110,22 @@ export default async function Page() {
         </p>
       )}
 
-      <SourceNote file="src/config/site.config.ts">
-        Every value on this page is read from that one file, which is also what
-        the public header, footer, page metadata and JSON-LD read. Editing it
-        and deploying changes all of them at once — which is why it is a single
-        source of truth rather than a settings table. The form above is the
-        interface a settings table will attach to; until there is one, Save
-        stores nothing.
+      <SourceNote file="src/config/site.config.ts · JournalSetting">
+        <p>
+          The identifiers, contact addresses and social links save to the
+          database and take effect across the site immediately. Everything else
+          — the title, publisher, frequency, language and access model — stays
+          in the config file, which is also what the public header, footer, page
+          metadata and JSON-LD read.
+        </p>
+        <p className="mt-2">
+          That split is deliberate: changing the journal&rsquo;s name or its
+          access model changes the journal rather than its configuration, and
+          belongs in a reviewed commit alongside the pages that would have to
+          change with it. The config file stays the default for the twelve
+          editable fields too — clearing one deletes its stored row and the
+          file&rsquo;s value stands again.
+        </p>
       </SourceNote>
     </SettingsPage>
   );

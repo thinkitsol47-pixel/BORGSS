@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { siteConfig } from "@/config/site.config";
+import { getJournalSettings } from "@/lib/api/journal-settings";
 import { DocPage, DocAside } from "@/components/layout/doc-page";
 
 export const metadata: Metadata = {
@@ -29,7 +30,12 @@ function Row({ term, children }: { term: string; children: React.ReactNode }) {
   );
 }
 
-export default function JournalInformationPage() {
+export default async function JournalInformationPage() {
+  // The stored values, falling back to the config file for anything unset —
+  // so an ISSN entered in /admin/settings/journal appears here the same day,
+  // without a deploy.
+  const settings = await getJournalSettings();
+
   return (
     <DocPage
       eyebrow="About the Journal"
@@ -69,20 +75,20 @@ export default function JournalInformationPage() {
         <Row term="Full title">{siteConfig.name}</Row>
         <Row term="Abbreviated title">{siteConfig.shortName}</Row>
         <Row term="ISSN (print)">
-          {siteConfig.issn || (
+          {settings.issn || (
             <span className="text-muted-foreground">
               Application in progress
             </span>
           )}
         </Row>
         <Row term="e-ISSN (online)">
-          {siteConfig.eIssn || (
+          {settings.eIssn || (
             <span className="text-muted-foreground">
               Application in progress
             </span>
           )}
         </Row>
-        <Row term="DOI prefix">{siteConfig.doiPrefix}</Row>
+        <Row term="DOI prefix">{settings.doiPrefix}</Row>
         <Row term="Subject area">Social Sciences (multidisciplinary)</Row>
         <Row term="Language of publication">English</Row>
       </dl>
@@ -157,8 +163,8 @@ export default function JournalInformationPage() {
       <h2 id="contact">Editorial office</h2>
       <dl className="not-prose divide-y divide-border rounded-lg border border-brand-border">
         <Row term="Editorial enquiries">
-          <a href={`mailto:${siteConfig.contact.editorialOffice}`}>
-            {siteConfig.contact.editorialOffice}
+          <a href={`mailto:${settings.editorialOffice}`}>
+            {settings.editorialOffice}
           </a>
         </Row>
         <Row term="Submissions">

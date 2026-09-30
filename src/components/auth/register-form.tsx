@@ -21,7 +21,6 @@ import {
   AuthHeading,
   OrcidField,
   PasswordField,
-  ScaffoldNotice,
   SubmitButton,
 } from "./auth-parts";
 
@@ -59,8 +58,13 @@ const ROLES = [
   {
     value: "reviewer",
     label: "To review for the journal",
+    // "Does not guarantee one" read as *probably, eventually* — which is not
+    // what happens. Choosing this records the interest and nothing else: the
+    // editor's shortlist is the reviewer pool, an account is not in it by
+    // registering, and nothing yet puts one there from this form. Saying so
+    // is the difference between a queue and a dead end.
     description:
-      "Review invitations are sent by editors; registering does not guarantee one.",
+      "Records your interest. Invitations come only after the editorial office adds you to the reviewer pool.",
   },
   {
     value: "both",
@@ -117,11 +121,6 @@ export function RegisterForm() {
         One account covers submitting, reviewing and editorial work — your role
         decides what you see.
       </AuthHeading>
-
-      <ScaffoldNotice>
-        Registration is not open yet. This form validates your details but
-        creates no account and sends no email.
-      </ScaffoldNotice>
 
       <form action={formAction} className="space-y-7" noValidate>
         {state.status === "error" && state.message && (

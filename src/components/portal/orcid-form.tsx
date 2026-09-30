@@ -20,7 +20,7 @@ export function OrcidForm({ current }: { current?: string }) {
   return (
     <form action={formAction} className="max-w-xl space-y-5" noValidate>
       {state.status === "success" && (
-        <Alert tone="info" title="Not saved">
+        <Alert tone="success" title="Saved">
           {state.message}
         </Alert>
       )}

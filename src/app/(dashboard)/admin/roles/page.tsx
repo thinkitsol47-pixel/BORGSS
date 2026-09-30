@@ -135,14 +135,14 @@ const ORDERED_PERMISSIONS: Permission[] = [
 export default async function Page() {
   const actor = await requireGroup("adminOnly");
 
-  const counts = roleHolderCounts();
+  const counts = await roleHolderCounts();
   const grantable = assignableRoles(actor.roles);
   const withheld = ROLES.filter((r) => !grantable.includes(r));
 
   return (
     <PortalPage
       title="Roles & permissions"
-      lead="The twelve roles, what each one can do, and which of them you may grant."
+      lead="The twelve roles, what each one can do, and which of them you may grant. The matrix itself is defined in src/config/roles.ts and changed by editing that file — a permission matrix editable through a web form is a way to lock everyone out of a journal."
     >
       {/* What this administrator may grant, before the matrix. It is the one
           thing on the page that differs by who is reading it. */}
@@ -347,14 +347,8 @@ export default async function Page() {
         </ul>
       </section>
 
-      <Alert tone="warning" title="The matrix is not editable" className="mt-10">
-        Roles and permissions are defined in{" "}
-        <code className="font-mono text-[0.9em]">src/config/roles.ts</code> and
-        changed by editing that file and deploying — not from this screen.
-        That is deliberate for now: a permission matrix editable through a web
-        form is a way to lock everyone out of a journal, and it needs an audit
-        trail and a recovery path before it is worth having.
-      </Alert>
+      {/* Where the matrix lives, and why it is not editable here, is in the
+          lead — read before the table rather than after it. */}
     </PortalPage>
   );
 }

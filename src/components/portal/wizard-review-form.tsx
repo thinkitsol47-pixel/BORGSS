@@ -2,15 +2,35 @@
 
 import Link from "next/link";
 import { useFormState } from "react-dom";
-import { AlertCircle, CheckCircle2, Pencil } from "lucide-react";
+import { AlertCircle, Pencil } from "lucide-react";
 import {
   submitSubmission,
   type WizardState,
 } from "@/app/(dashboard)/submissions/actions";
-import { Alert, Button, CheckOption, Field, Textarea } from "@/components/ui";
+import type { DraftSummary } from "@/lib/api/submissions";
+import { ARTICLE_TYPES } from "@/lib/validation/schemas";
+import { Alert, CheckOption, Field, Textarea } from "@/components/ui";
 import { WizardNav } from "./wizard-nav";
 import { WIZARD_STEPS } from "./wizard-steps";
 import { cn } from "@/lib/utils";
+
+/** Built from the same list the type radios are built from, so a type cannot
+ *  be chosen under one label and read back under another. */
+const ARTICLE_TYPE_LABEL: Record<string, string> = Object.fromEntries(
+  ARTICLE_TYPES.map((t) => [t.value, t.label]),
+);
+
+/** The seven `SubmissionFileKind` values, kebab-cased as the data layer
+ *  returns them. */
+const FILE_KIND_LABEL: Record<string, string> = {
+  manuscript: "Manuscript",
+  "title-page": "Title page",
+  "cover-letter": "Cover letter",
+  figure: "Figure",
+  table: "Table",
+  supplementary: "Supplementary",
+  "response-to-reviewers": "Response to reviewers",
+};
 
 const initialState: WizardState = { status: "idle" };
 
@@ -21,24 +41,62 @@ const initialState: WizardState = { status: "idle" };
  * screens across several sittings needs to see the whole submission in one
  * place before it leaves their hands.
  *
- * With no database there is nothing to summarise, and inventing plausible
- * placeholder values would be the worst possible thing to show on a
- * confirmation screen — the author would be confirming someone else's data.
- * So each step's row states plainly that it has nothing to show and links back
- * to the step, and the submit button is disabled while that is true.
+ * There is no success branch here on purpose. `submitSubmission` moves the
+ * draft in one transaction and then `redirect`s to `/submissions/[id]`, so a
+ * successful submit never returns to this component — the author's own detail
+ * page, with the manuscript and its reference on it, is what confirms the
+ * submission. Only an error comes back to this form.
  */
 
 /** The five steps whose answers this screen would summarise. */
 const SUMMARY_STEPS = WIZARD_STEPS.filter((s) => s.id !== "review");
 
-export function WizardReviewForm({ draftId }: { draftId: string }) {
+export function WizardReviewForm({
+  draftId,
+  summary,
+}: {
+  draftId: string;
+  summary: DraftSummary | null;
+}) {
   const [state, formAction] = useFormState(submitSubmission, initialState);
 
-  if (state.status === "success") {
-    return <SubmitOutcome message={state.message} draftId={draftId} />;
+  const v = state.values ?? {};
+
+  if (!summary) {
+    return (
+      <Alert tone="danger" title="This draft cannot be opened">
+        It may have been submitted already, or it may belong to another account.
+        Open your{" "}
+        <Link href="/submissions" className="font-medium underline">
+          submissions list
+        </Link>{" "}
+        to find it.
+      </Alert>
+    );
   }
 
-  const v = state.values ?? {};
+  /* What each step contributed, read back from the draft. `null` means the
+     step has not been completed — rendered as a prompt to go and do it, never
+     as a blank row, because a blank row reads as "nothing was asked". */
+  const stepValues: Record<string, string | null> = {
+    details: [ARTICLE_TYPE_LABEL[summary.type] ?? summary.type, summary.sectionName]
+      .filter(Boolean)
+      .join(" · "),
+    upload:
+      summary.files.length > 0
+        ? summary.files.map((f) => `${FILE_KIND_LABEL[f.kind] ?? f.kind}: ${f.filename}`).join(" · ")
+        : null,
+    metadata: summary.abstract.trim()
+      ? `${summary.title}${summary.keywords.length ? ` — ${summary.keywords.join(", ")}` : ""}`
+      : null,
+    contributors:
+      summary.contributors.length > 0
+        ? summary.contributors
+            .map((c) => (c.isCorresponding ? `${c.name} (corresponding)` : c.name))
+            .join(", ")
+        : null,
+    declarations: summary.declaredAt ? "Confirmed" : null,
+  };
 
   return (
     <div className="space-y-8">
@@ -47,7 +105,11 @@ export function WizardReviewForm({ draftId }: { draftId: string }) {
           Your submission
         </h2>
         <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-          Check every section before submitting. Once submitted, changes go
+          Reference{" "}
+          <strong className="font-semibold text-foreground">
+            {summary.reference}
+          </strong>
+          . Check every section before submitting. Once submitted, changes go
           through the editorial office rather than through this form.
         </p>
 
@@ -57,6 +119,7 @@ export function WizardReviewForm({ draftId }: { draftId: string }) {
               step.id === "details"
                 ? "/submissions/new"
                 : `/submissions/new/${draftId}/${step.id}`;
+            const value = stepValues[step.id];
 
             return (
               <li
@@ -68,10 +131,16 @@ export function WizardReviewForm({ draftId }: { draftId: string }) {
                     <span className="text-muted-foreground">{i + 1}.</span>{" "}
                     {step.label}
                   </p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {step.hint}. Nothing to show — answers are not carried
-                    between steps yet.
-                  </p>
+                  {value ? (
+                    <p className="mt-1 break-words text-sm leading-relaxed text-muted-foreground">
+                      {value}
+                    </p>
+                  ) : (
+                    <p className="mt-1 flex items-start gap-1.5 text-sm leading-relaxed font-medium text-warning">
+                      <AlertCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                      Not completed yet — {step.hint.toLowerCase()}.
+                    </p>
+                  )}
                 </div>
                 <Link
                   href={href}
@@ -87,15 +156,11 @@ export function WizardReviewForm({ draftId }: { draftId: string }) {
         </ul>
       </section>
 
-      <Alert tone="warning" title="This summary is empty on purpose">
-        The portal cannot save a draft yet, so there is nothing to gather from
-        the steps behind this one. Rather than show invented values for you to
-        confirm, each row says so and links back to its step. When the database
-        is connected, this screen will list every answer exactly as the
-        editorial office will receive it.
-      </Alert>
-
       <form action={formAction} className="space-y-7" noValidate>
+        {/* The draft being submitted. The action re-checks ownership and
+            re-validates every step from the database rather than trusting
+            either this value or the per-step checks that came before. */}
+        <input type="hidden" name="draftId" value={draftId} />
         {state.status === "error" && state.message && (
           <Alert tone="danger" title="Could not submit">
             {state.message}
@@ -174,70 +239,3 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-/**
- * The success state.
- *
- * Every other step ends with "this step is valid". This one cannot borrow that
- * wording: an author who reaches the end of a submission wizard and sees a
- * green tick will believe their manuscript is with the journal. So this states
- * what did not happen first, then gives the route that does work today.
- */
-function SubmitOutcome({
-  message,
-  draftId,
-}: {
-  message?: string;
-  draftId: string;
-}) {
-  return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-warning/30 bg-warning/5 p-6">
-        <span
-          aria-hidden
-          className="grid size-11 place-items-center rounded-xl bg-warning/10 text-warning"
-        >
-          <CheckCircle2 className="size-5" />
-        </span>
-        <h2 className="mt-3 font-serif text-lg font-semibold">
-          Checked, but not submitted
-        </h2>
-        {message && (
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {message}
-          </p>
-        )}
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Your manuscript has <strong className="font-semibold text-foreground">not</strong>{" "}
-          reached the editorial office, and no manuscript ID has been issued.
-          Nothing you entered has been kept.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-brand-border bg-brand-tint p-6">
-        <h2 className="font-serif text-lg font-semibold">
-          How to submit today
-        </h2>
-        <p className="mt-2 text-sm leading-relaxed text-brand-darker">
-          Online submission is not open yet. Until it is, the editorial office
-          accepts manuscripts by email, and the submission page lists exactly
-          which files to attach.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Button href="/for-authors/how-to-submit">How to submit by email</Button>
-          <Button href="/submissions" variant="outline">
-            My submissions
-          </Button>
-        </div>
-      </div>
-
-      <p className="text-sm text-muted-foreground">
-        <Link
-          href={`/submissions/new/${draftId}/declarations`}
-          className="font-medium text-primary hover:text-brand-dark hover:underline"
-        >
-          Back to declarations
-        </Link>
-      </p>
-    </div>
-  );
-}

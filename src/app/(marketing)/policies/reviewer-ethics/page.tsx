@@ -29,7 +29,6 @@ export default function Page() {
       title="Peer Reviewer Ethics Policy"
       lead="Reviewing gives you privileged access to someone else's unpublished work and real influence over whether it appears. This policy sets out the obligations that come with that."
       toc={TOC}
-      updated="2026-01-15"
       related={["peer-review", "conflict-of-interest", "ai-policy"]}
     >
       <h2 id="role">The reviewer&rsquo;s role</h2>

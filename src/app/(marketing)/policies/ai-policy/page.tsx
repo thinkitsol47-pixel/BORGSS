@@ -30,7 +30,6 @@ export default function Page() {
       title="AI-Assisted Writing Policy"
       lead="Generative AI may assist in preparing a manuscript, within limits and with disclosure. It cannot be an author, it cannot be given a manuscript to review, and it cannot carry responsibility for anything it produces."
       toc={TOC}
-      updated="2026-01-15"
       related={["authorship", "research-integrity", "reviewer-ethics"]}
     >
       <h2 id="position">The journal&rsquo;s position</h2>

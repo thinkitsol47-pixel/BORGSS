@@ -1,8 +1,33 @@
 # BORJSS — project instructions
 
 Blue Ocean Research Journal for Social Sciences. A scholarly journal publishing
-platform: Next.js 14 App Router, TypeScript, Tailwind. Frontend only so far —
-no backend, no database, no auth. Data comes from `src/lib/api/mock-data.ts`.
+platform: Next.js 14 App Router, TypeScript, Tailwind, **PostgreSQL through
+Prisma**.
+
+The frontend is complete. The backend is part-built: every portal screen now
+**reads** from the database, and much of the writing works too — the public
+forms, the editorial decision and reviewer assignment, the reviewer's report,
+profile settings, and the announcements CRUD all persist. **Authentication is
+real** — Supabase Auth, with the middleware closing every portal route to
+anyone without a session, and Row Level Security on across all 34 tables.
+Email is connected through Resend but **can only reach one address until the
+journal buys a domain**, which is why addresses go unverified and a
+password-reset link may not be delivered. File storage works for submissions: an author
+can complete the wizard and the manuscript is uploaded, stored confidentially
+and downloadable by the people entitled to it. **Production galleys upload and
+download the same way**, every production stage transition and proof correction
+persists, and an author whose manuscript comes back can **upload the revision**
+through the portal. The workflow now joins up end to end: an editor's
+acceptance **creates the production job** that carries a manuscript into
+production, and an administrator can put an account **into the reviewer pool**
+that editors are offered from — two links that had no code behind them until
+2026-09-16. **Issue planning landed the same day**, which was the last unbuilt
+feature and the last one that was purely code: an editor can open an issue,
+place accepted manuscripts into it, set their running order and take them out
+again. What is left is only what money buys: a domain (which unblocks all
+email), a Crossref prefix, an ISSN and an e-ISSN.
+`docs/PROGRESS.md` under "Backend progress" is the live record of what has
+landed; `src/lib/api/mock-*.ts` now feeds `prisma/seed.ts` rather than the app.
 
 **Read `docs/PROGRESS.md` before starting work.** It says what is built, what is
 pending, and where to pick up.
@@ -92,9 +117,35 @@ paths on every run, including paths to directories that no longer exist, which
 fills the client's editor with errors. `.next-build-*` is in both `exclude` and
 `.gitignore`. Keep it that way.
 
-**Never state on a page that a feature exists when the code shows a stub.** This
-already happened once: the indexing page claimed OAI-PMH was "Active" while
-`api/oai/route.ts` returns not-implemented. Check the code, then write the copy.
+**Never state on a page that a feature exists when the code shows a stub** —
+and re-read the notices when a feature lands. Both directions have gone wrong
+here. The indexing page once claimed OAI-PMH was "Active" while
+`api/oai/route.ts` returned not-implemented. Later, a dozen screens still said
+"there is no database" and "no file storage" weeks after both existed, and the
+login page announced "Not live yet" above a working sign-in form. Stale notices
+are the harder failure: nothing breaks, no test fails, and the reader stops
+believing the rest of the page. **When you finish a feature, grep for the
+notices that described its absence.**
+
+**A replacement notice needs the same scrutiny as the one it replaces, and a
+true sentence can still be in the wrong place.** Issue planning (2026-09-16)
+produced four of these in one change, all found by walking the screens rather
+than by any script: a *published* issue carried "this issue cannot be published
+yet" beneath its own Published badge, offered an Edit button to a form that
+refuses it, and told the reader to consult a list that is not rendered there;
+and the issues list carried a publishing notice although it has no publish
+control, directly under the section listing the published issues. Each sentence
+was true of the feature and false of the screen. So: **write a notice about a
+thing where that thing is decided, guard it on the state it describes, and then
+open the page in the states it can actually be in** — a published issue, an
+empty one, a phone.
+
+**Every new table needs `ALTER TABLE "X" ENABLE ROW LEVEL SECURITY` in its own
+migration.** A new table defaults to RLS off, and the loop in
+`20260908120000_enable_rls` only covered what existed when it ran. Without the
+line, Supabase's anon key can read the table through the auto-generated REST
+API and the dashboard flags it UNRESTRICTED. All 34 tables are currently
+protected — keep it that way.
 
 ---
 
@@ -104,7 +155,13 @@ There is no browser automation installed, and installing Playwright/Puppeteer is
 not worth it for this project. Two approaches are in use:
 
 **Two structural audits**, both fetching every page and checking the rendered
-HTML. Both currently report **0 findings across 87 pages** — keep them there.
+HTML. Both currently report **0 findings across 96 pages** — keep them there.
+
+**The audits sign in for real.** Portal routes are guarded, so without a session
+they would grade the login page once per route and report a clean sweep of pages
+they never saw. Set `AUDIT_EMAIL` and `AUDIT_PASSWORD` (a superAdmin account) in
+`.env.local`; without them the audits print a warning saying the portal was not
+audited. See `scripts/audit-session.mjs`.
 
 - `node scripts/responsive-audit.mjs http://localhost:3100` — grids that never
   collapse, fixed column templates, tables without a scroll container,
@@ -159,22 +216,154 @@ admin or superAdmin.
 
 ---
 
+## The services — settled 2026-09-08
+
+Supabase Postgres (database) · Supabase Auth (50k MAU free) · **Cloudinary**
+(files and images, 25 GB free) · Resend, Brevo the fallback (email, Phase 6).
+All free tiers, none near its limit.
+
+**Cloudinary is the one with a catch, and it is worse than it looks.** Its
+default is a permanently public URL, so every upload passes
+`type: "authenticated"` and every read mints a short-lived signed URL after
+checking entitlement. **But an `authenticated` upload still returns a
+`secure_url` whose signature never expires** — verified against the live
+account, it opens with a plain fetch, forever. Storing that URL would make
+every manuscript one leaked column away from public.
+
+So: **`src/lib/storage/` is the only caller of Cloudinary**, `putFile` returns
+the `publicId` and never a URL, and reads go through `/files/<id>`, which
+checks `lib/storage/entitlement.ts` and 302s to a ten-minute link. A `publicId`
+on its own opens nothing (401). Never store a signed URL, email one, or log
+one — it is a bearer token. `putPublicFile` is the deliberate exception, for
+published articles, and is named so the difference is a decision rather than a
+forgotten flag.
+
+**Two kinds of file, two rules, one route.** `/files/<id>` serves a
+`SubmissionFile`; `/files/galley:<id>` serves a `ProductionGalley`. They are
+separate entitlement functions on purpose — a galley lives in a different table
+with no author column, so extending the submission rule by analogy would have
+meant guessing which branches still applied. `fileAccessFor()` allows
+editorial/production staff, the submitting author, and an assigned reviewer
+(never the title page or cover letter, which name the authors).
+`galleyAccessFor()` is narrower: **production and editorial staff only, no
+author branch and no reviewer branch at all** — an unapproved galley is not
+something to hand an author a standing link to, and review is over by the time
+anything is typeset. Keep both on the one route: one guard, one place a signed
+URL is minted.
+
 ## Known gaps — do not present these as finished
 
-- Contact and reviewer-application forms validate but do not send. Both are
-  marked `TODO(backend)`; they need a real mail provider. So does every other
-  message the portal promises — `/admin/settings/email-templates` lists all 15.
+**Nothing in the app reads a fixture** (settled 2026-09-17) — `src/lib/api/mock-*.ts`
+is read only by `prisma/seed.ts`. **That is not the same as "no screen shows
+invented data", and saying so here was wrong until 2026-09-18.** A row read
+from Postgres is not real because it came from Postgres; the seed had put it
+there. The public record — twelve named board members at real institutions,
+seven articles with DOIs and bylines, two issues, ten posts — was invented
+data served through a real query, on exactly the pages DOAJ and the ISSN
+centre verify by writing to the people named.
+
+**The public record is now empty, and the seed will not refill it.**
+`SEED_PUBLIC=1` is required to seed `Issue`, `Article`, `Post` and
+`BoardMember`; `scripts/clear-public-content.mjs` removes them (dry-run
+unless `--apply`). Portal demo data stays — it is behind a login, and it
+shows the client a workflow that an empty portal cannot demonstrate.
+
+When emptying a table, **open the screens in the state they now render in**.
+Three were wrong here: the board page had no empty state and would have shown
+"0 members / 0 institutions / 0 countries"; `/articles` offered *Clear
+filters* on an archive with nothing to reveal; the homepage asserted a
+"6 wks median to first decision" that no query produced.
+
+Two further things were removed earlier, and both should stay removed:
+
+- **The audit log's eight seeded rows.** `prisma/seed.ts` no longer writes
+  `mockAuditEntries` at all. An audit log is read precisely when someone is not
+  trusted, and invented rows sitting beside real ones — "granted sectionEditor",
+  "reopened a review round in error" — describe things nobody did. The table
+  starts empty and fills as the journal is used, which is the correct starting
+  state for an append-only record. The screen's notice derives its own count, so
+  it corrects itself rather than asserting a number.
+- **The two `alert()` controls on `/admin/announcements`.** Expiring and
+  deleting a post now persist. `expirePost` sets `expiresAt` to **a second ago**,
+  not to now: every public filter keeps a post while `expiresAt >= now`, so a
+  timestamp of exactly now leaves it listed — verified against the database
+  before the second was subtracted.
+
+The only `alert()` left is on `/admin/doi`, and both its buttons are
+**disabled** with the reason on the button itself. It is unreachable until a
+Crossref prefix exists, so it promises nothing.
+
+- **Email sends, but only to one address.** Resend is connected and six of the
+  fifteen templates are written. **The journal owns no domain**, so Resend
+  delivers only to the Resend account owner's own address and only from
+  `onboarding@resend.dev` — mail to an author or reviewer is refused with a
+  403. Buying a domain and verifying it at resend.com/domains is the whole fix;
+  only `EMAIL_FROM` changes. Until then `canReachRecipients()` is false and no
+  screen may promise a recipient that a message was sent to them.
+  `/admin/messages` and `/admin/reviewer-applications` remain the queues the
+  office actually works; `/admin/settings/email-templates` lists all 15.
 - Manuscript template files do not exist yet. The templates page says so
   honestly — leave it that way until the files are real.
-- **Nothing authenticates.** `src/middleware.ts` has its redirect commented
-  out and `getCurrentUser()` returns a fixed mock user, so every portal route
-  is browsable without signing in. `robots.ts` disallows them and both
-  non-public layouts set `noindex`, but neither is a substitute for auth.
+- ~~Proof corrections~~ and ~~revision uploads~~ — **both built 2026-09-14.**
+  Corrections needed `20260914120000_proof_correction_fields`, which gave
+  `location` and `raisedBy` real columns; they used to share one string with
+  the description, which a form cannot safely re-encode. Revisions needed no
+  migration.
+- **Issue planning — built 2026-09-16.** Creating and editing an issue, placing
+  an accepted manuscript into one, reordering and removing all persist through
+  `(dashboard)/editorial/issues/actions.ts`. No migration was needed; the tables
+  were already there with RLS on. Two things to keep in mind when touching it:
+  **two tables answer "which issue is this in"** — `IssuePlanItem` is the
+  running order, `ProductionJob.issueId` is what the production queue reads for
+  a job's target date — so every placement and removal writes both in one
+  transaction, or the queue quietly stops showing deadlines. And **positions are
+  kept contiguous**: a removal closes the gap, because a hole is invisible on
+  screen and breaks the reorder controls silently.
+  *Publishing* an issue stays blocked, and deliberately has no code path at all:
+  `issueSchema` does not accept `published`, so the form cannot reach the state.
+  It mints DOIs and there is no Crossref prefix.
+- **The reviewer role and the reviewer pool are different things** (built
+  2026-09-16). Registration grants `reviewer` to anyone; an editor's shortlist
+  comes from `ReviewerProfile`, and nothing but the seed wrote one — an account
+  could hold the role forever and reach no editor. `/admin/users/[userId]/edit`
+  now has a *Reviewer pool* section. Sections there are checkboxes from the
+  `Section` table and re-validated server-side, because `sectionMatch` is an
+  exact `includes()` and a hand-typed name silently never matches. Availability
+  is deliberately not offered — it is the reviewer's own statement, not the
+  office's.
+- **Accepting a manuscript creates its production job** (built 2026-09-16),
+  inside `recordDecision`'s transaction, with all three stages `notStarted`.
+  Before this, `productionJob.create` existed only in the seed and nothing ever
+  entered production through the app.
+- **Auth works, but two flows still wait on email.** Sign-in, registration,
+  password reset and sign-out run on Supabase Auth, and `src/middleware.ts`
+  redirects every portal route to `/login` without a session. What is not
+  finished: **addresses are not verified** (registration sets
+  `email_confirm: true` because no mail provider is connected — set it back to
+  `false` when Resend lands) and **a reset link may not be delivered**, since
+  Supabase's built-in mailer is rate-limited and is not a delivery service.
+  Both say so on screen. **The demo door is gone** — no cookie, no one-click
+  entry, no environment bypass. One account can sign in
+  (`ceoborjss@gmail.com`, superAdmin); the other 39 `User` rows are seeded
+  profiles with no credentials.
 - **No Crossref prefix, no ISSN, no e-ISSN.** Every DOI in the app begins
   `10.xxxxx` and resolves nowhere. These three block a DOAJ application;
   `/admin/settings/journal` and `/admin/doi` both say so on screen.
-- **A section-name drift in the fixtures.** Manuscripts are filed under
-  "Gender Studies", which is not one of the ten subject areas declared on
-  `/about/aims-scope` — the real name is "Gender & Development". Visible on
-  `/admin/settings/sections`. A section is a free string with no registry
-  behind it, which is what allows this.
+- **A section-name drift, now only in the fixtures.** `mock-submissions.ts`
+  files manuscripts under "Gender Studies", which is not one of the ten subject
+  areas on `/about/aims-scope` — the declared name is "Gender & Development".
+  **Fixed everywhere the app actually reads:** `Section` is a real table with a
+  foreign key, `/admin/settings/sections` edits it, and `prisma/seed.ts`
+  corrects the name on the way in. It survives only in the source fixtures, so
+  a new code path that reads those files directly instead of the database would
+  reintroduce it.
+- **Only twelve journal settings are editable, deliberately.**
+  `/admin/settings/journal` saves the identifiers, contact addresses and social
+  links to `JournalSetting`; the title, publisher, frequency, language and
+  access model stay in `site.config.ts` because changing one changes the
+  journal rather than its configuration. The config file is the default and a
+  stored row is an override — clearing a field deletes its row rather than
+  storing `""`. **Review forms, policies and email templates stay in code**;
+  each screen states why, and those reasons are load-bearing (a review
+  criterion is a key stored on every past report; a policy is audited prose; a
+  template is a function with typed arguments).

@@ -69,11 +69,15 @@ export default async function HomePage() {
     <>
       <Hero />
 
+      {/* Only what the journal can stand behind. "Median to first decision"
+          used to sit here at a flat "6 wks", which no query produced and no
+          manuscript had yet tested — a figure a prospective author weighs a
+          submission against. It returns when there are decisions to measure. */}
       <StatStrip
         stats={[
           { value: `${published.length}`, label: "Articles published" },
           { value: "Vol. 1", label: "Current volume", hint: "Since 2026" },
-          { value: "6 wks", label: "Median to first decision" },
+          { value: "Double-blind", label: "Peer review" },
           { value: "100%", label: "Open access", hint: "No reader fees" },
         ]}
       />

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText, PenLine, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Download, FileText, PenLine, ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-role";
 import { getReviewTaskById } from "@/lib/api/reviews";
 import {
@@ -88,7 +88,9 @@ export default async function Page({
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-start">
         <div className="min-w-0 space-y-8">
-          {isInvitation && <InvitationResponse dueAt={task.dueAt} />}
+          {isInvitation && (
+            <InvitationResponse reviewId={task.id} dueAt={task.dueAt} />
+          )}
 
           {task.invitationNote && (
             <section aria-labelledby="editor-note">
@@ -164,32 +166,64 @@ export default async function Page({
             </p>
 
             <ul className="mt-4 space-y-2">
-              {task.files.map((f) => (
-                <li
-                  key={f.id}
-                  className="flex items-center gap-2.5 rounded-lg border p-2.5"
-                >
-                  <span
-                    aria-hidden
-                    className="grid size-8 shrink-0 place-items-center rounded-md bg-brand-tint text-brand-dark"
-                  >
-                    <FileText className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium">
-                      {f.filename}
+              {task.files.map((f) => {
+                const body = (
+                  <>
+                    <span
+                      aria-hidden
+                      className="grid size-8 shrink-0 place-items-center rounded-md bg-brand-tint text-brand-dark"
+                    >
+                      <FileText className="size-4" />
                     </span>
-                    <span className="block text-[11px] text-muted-foreground">
-                      {Math.round(f.sizeBytes / 1024)} KB
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-medium">
+                        {f.filename}
+                      </span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {Math.round(f.sizeBytes / 1024)} KB
+                      </span>
                     </span>
-                  </span>
-                </li>
-              ))}
+                  </>
+                );
+
+                // `/files/<id>` re-checks that this reviewer holds a live
+                // assignment on the manuscript before it signs anything.
+                return (
+                  <li key={f.id}>
+                    {f.stored ? (
+                      <a
+                        href={`/files/${f.id}`}
+                        className="flex items-center gap-2.5 rounded-lg border p-2.5 hover:border-brand hover:bg-brand-tint"
+                      >
+                        {body}
+                        <Download
+                          className="size-3.5 shrink-0 text-primary"
+                          aria-hidden
+                        />
+                        <span className="sr-only">Download {f.filename}</span>
+                      </a>
+                    ) : (
+                      <span className="flex items-center gap-2.5 rounded-lg border p-2.5">
+                        {body}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
 
-            <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-              Downloads become available when the file store is connected.
-            </p>
+            {/* Was an unconditional "downloads become available when the file
+                store is connected" — untrue since storage landed, and printed
+                even above files that download perfectly well. A file without a
+                link is one recorded before storage existed, which is a fact
+                about that file, not about the portal. Same wording as the
+                editorial overview, and shown only when one is actually there. */}
+            {task.files.some((f) => !f.stored) && (
+              <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                Files without a download link were recorded before the journal
+                had file storage; the editorial office holds those by email.
+              </p>
+            )}
           </Card>
 
           <Card className="p-5">

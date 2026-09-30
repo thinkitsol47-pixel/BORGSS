@@ -1,27 +1,31 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import {
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
 } from "@/lib/validation/schemas";
-import { DEMO_ACCOUNTS, ROLE_COOKIE } from "@/lib/auth/current-user";
-import { isDemoMode } from "@/lib/auth/demo-mode";
+import { supabaseServer, supabaseAdmin } from "@/lib/auth/supabase";
+import { db } from "@/lib/db";
+import type { Role } from "@/config/roles";
+import { sendEmail } from "@/lib/email/send";
+import { welcomeEmail } from "@/lib/email/templates";
 
 /**
- * Auth Server Actions.
+ * Auth Server Actions, on Supabase Auth.
  *
- * SCAFFOLD: every action here validates its input and returns. None of them
- * authenticates anyone, creates an account, sends an email or sets a session
- * cookie — there is no auth backend yet, and `middleware.ts` is a scaffold
- * whose redirect is deliberately commented out.
+ * **Two stores, joined on one id.** Supabase Auth holds the credentials and the
+ * session; this app's `User` table holds the name, roles, affiliation and
+ * notification settings the portal renders. `User.id` *is* the `auth.users` id
+ * — decided in phase 1 precisely so that no second key has to be kept in step.
  *
- * Wire each marked section to the real provider (Auth.js / Supabase) together
- * with the transactional mail provider. Until then the forms demonstrate
- * validation, error handling and the success states, and nothing more.
+ * **What still does not work:** anything that needs an email to arrive.
+ * Supabase's built-in mailer is rate-limited to a handful of messages an hour
+ * and is not a delivery service, so password reset and address verification
+ * stay incomplete until Resend lands in phase 6. Both actions below say so on
+ * screen rather than reporting a success the visitor's inbox will contradict.
  */
 
 export type AuthState = {
@@ -31,6 +35,19 @@ export type AuthState = {
   errors?: Record<string, string>;
   /** Echoed back so the form can be repopulated after a failed submit. */
   values?: Record<string, string>;
+  /**
+   * Where the browser should go after a successful sign-in.
+   *
+   * **The action deliberately does not `redirect()` itself.** `redirect()`
+   * works by throwing, and the throw aborts the action before the
+   * `Set-Cookie` headers Supabase queued during `signInWithPassword` are
+   * flushed. The session is created — but the browser never receives the
+   * cookie, so the very next request looks signed out and the middleware
+   * bounces it straight back to `/login` with the fields cleared. That is
+   * precisely the loop this field exists to prevent: the cookie now goes out
+   * with a normal response, and the client navigates once it has it.
+   */
+  redirectTo?: string;
 };
 
 /** Collects Zod issues into the flat shape the forms render. */
@@ -70,62 +87,44 @@ export async function signIn(
     };
   }
 
-  // TODO(backend): verify the credentials, set the session cookie, and
-  // redirect to the `next` parameter or the dashboard.
-  await new Promise((r) => setTimeout(r, 400));
+  const email = parsed.data.email.trim().toLowerCase();
 
-  // Demo accounts, so the portal can be walked without a backend. Each address
-  // maps to a role; the password is ignored entirely. Available in development
-  // and on preview deployments, never on the production domain — the guard is
-  // the environment itself, not a comment someone has to remember to remove.
-  if (isDemoMode()) {
-    const role = DEMO_ACCOUNTS[parsed.data.email.trim().toLowerCase()];
-    if (role) {
-      cookies().set(ROLE_COOKIE, role, {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-      });
-      redirect("/dashboard");
-    }
-  }
-
-  return {
-    status: "error",
-    message:
-      "Sign-in is not available yet — the journal's account system is still being built. Nothing is wrong with what you entered.",
-    values: safeValues(raw),
-  };
-}
-
-/* ------------------------------------------------------- one-click demo in */
-
-/**
- * Opens the portal as a super administrator with no credentials at all.
- *
- * There is nothing to authenticate against yet, so a demo password would be a
- * password that guards nothing while still having to be sent to whoever is
- * being shown the portal. The guard that matters is `isDemoMode()` — unset
- * BORJSS_DEMO and this action refuses, whether or not the button is rendered.
- *
- * Re-checked here rather than trusted from the page: a Server Action can be
- * invoked without the form that submits it ever having been rendered.
- *
- * TODO(backend): delete this action, its button in `login-form.tsx`, and
- * `DEMO_ACCOUNTS`, when real sessions exist.
- */
-export async function signInAsDemoAdmin(): Promise<void> {
-  if (!isDemoMode()) {
-    throw new Error("Demo sign-in is not available.");
-  }
-
-  cookies().set(ROLE_COOKIE, "superAdmin", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
+  const { error } = await supabaseServer().auth.signInWithPassword({
+    email,
+    password: parsed.data.password,
   });
 
-  redirect("/dashboard");
+  if (error) {
+    // Deliberately one message for both "no such account" and "wrong password".
+    // Distinguishing them tells an attacker which addresses are registered,
+    // which is the same account-enumeration leak the reset flow avoids.
+    return {
+      status: "error",
+      message: "That email address and password do not match an account.",
+      values: safeValues(raw),
+    };
+  }
+
+  // Returned, not redirected. See `AuthState.redirectTo` for why: a
+  // `redirect()` here throws before the session cookie is flushed, so the
+  // browser lands on the portal with no cookie and is sent back to /login.
+  return { status: "success", redirectTo: safeNext(raw.next) };
+}
+
+/**
+ * Where to land after signing in.
+ *
+ * Only in-app paths are accepted. `next` arrives in the URL, so without this an
+ * emailed `/login?next=https://elsewhere.example` would turn the journal's own
+ * sign-in page into an open redirect — the visitor authenticates, and the
+ * journal hands them to someone else's site looking as if it vouched for it.
+ * A protocol-relative `//host` is rejected for the same reason.
+ */
+function safeNext(value: string | undefined): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/dashboard";
+  }
+  return value;
 }
 
 /* --------------------------------------------------------------- register */
@@ -152,17 +151,82 @@ export async function register(
     return { status: "success" };
   }
 
-  // TODO(backend): create the account, hash the password, and send the
-  // verification email. Until then nothing is stored.
-  await new Promise((r) => setTimeout(r, 500));
+  const d = parsed.data;
+  const email = d.email.trim().toLowerCase();
+  const admin = supabaseAdmin();
+
+  // The auth account first. Its generated id becomes the profile's primary key,
+  // so this has to succeed before there is anything to write a profile against.
+  //
+  // `email_confirm: true` because no mail provider is connected yet (phase 6):
+  // leaving it false would create accounts that can never sign in, since the
+  // confirmation link would never arrive. **Set this back to false when Resend
+  // lands** — until then an unverified address can register, which is the
+  // honest trade for the flow working at all.
+  const created = await admin.auth.admin.createUser({
+    email,
+    password: d.password,
+    email_confirm: true,
+    user_metadata: { name: d.name },
+  });
+
+  if (created.error || !created.data.user) {
+    const already = /already|exists|registered/i.test(created.error?.message ?? "");
+    return {
+      status: "error",
+      message: already
+        ? "An account already exists for that email address. Try signing in, or reset your password."
+        : "The account could not be created. Please try again, or contact the editorial office.",
+      errors: already ? { email: "This address is already registered." } : undefined,
+      values: safeValues(raw),
+    };
+  }
+
+  // "both" is not a role — it is the register form's way of asking for two.
+  // `roles.ts` has no such member, so it is expanded here rather than stored.
+  const roles: Role[] =
+    d.intendedRole === "both" ? ["author", "reviewer"] : [d.intendedRole];
+
+  try {
+    await db.user.create({
+      data: {
+        id: created.data.user.id,
+        name: d.name,
+        email,
+        affiliation: d.institution,
+        country: d.country,
+        orcid: d.orcid || null,
+        // `active`, not `invited`: they registered themselves and can sign in
+        // now. `invited` is for an account the office created for someone who
+        // has not yet appeared.
+        status: "active",
+        roles: { create: roles.map((role) => ({ role })) },
+      },
+    });
+  } catch {
+    // The auth account exists but the profile does not, and `getCurrentUser()`
+    // returns null for exactly that state — the visitor would authenticate into
+    // a redirect loop. Removing the auth account leaves the address free to
+    // register again, which is the recoverable outcome.
+    await admin.auth.admin.deleteUser(created.data.user.id);
+    return {
+      status: "error",
+      message: "The account could not be created. Please try again, or contact the editorial office.",
+      values: safeValues(raw),
+    };
+  }
+
+  // Not awaited for its result beyond logging: the account exists either way,
+  // and a mail failure must not turn a successful registration into an error
+  // the visitor would retry — producing "this address is already registered".
+  const mail = await sendEmail(welcomeEmail({ to: email, name: d.name }));
 
   return {
     status: "success",
-    message:
-      "Your details passed validation. Account creation is not live yet — no account has been created and no email has been sent.",
-    // Carried so the success view can point at the verify-email page the way
-    // the real flow will, once registration issues a verification link.
-    values: { email: parsed.data.email },
+    message: mail.ok
+      ? "Your account has been created and a confirmation is on its way. You can sign in now."
+      : "Your account has been created — you can sign in now. No confirmation email was sent; email delivery is still being set up.",
+    values: { email },
   };
 }
 
@@ -188,17 +252,31 @@ export async function requestPasswordReset(
     return { status: "success" };
   }
 
-  // TODO(backend): look up the address, mint a single-use token and email the
-  // reset link. The response deliberately does not reveal whether an account
-  // exists — that is an account-enumeration leak — so the success message is
-  // the same either way once this is live.
-  await new Promise((r) => setTimeout(r, 500));
+  // Supabase mints the token and sends the link. The result is deliberately
+  // ignored: it distinguishes "no such account" from "sent", and returning that
+  // difference would let anyone test which addresses are registered. Same
+  // message either way.
+  await supabaseServer().auth.resetPasswordForEmail(
+    parsed.data.email.trim().toLowerCase(),
+    // The callback route, not the page: Supabase sends a one-time code that has
+    // to be exchanged for a session server-side before the form can act.
+    { redirectTo: `${siteUrl()}/auth/callback?next=/reset-password` },
+  );
 
+  // TODO(phase 6): Supabase's built-in mailer is rate-limited to a few messages
+  // an hour and is not a delivery service. Until Resend is connected, a reset
+  // link may not arrive at all — which is why the message below says so rather
+  // than promising an email the visitor will sit waiting for.
   return {
     status: "success",
     message:
-      "Password reset is not live yet, so no email has been sent. Once the account system is running, a reset link will arrive at this address if an account exists for it.",
+      "If an account exists for that address, a reset link is on its way. Email delivery is still being set up, so if nothing arrives within a few minutes, contact the editorial office.",
   };
+}
+
+/** The origin reset and verification links come back to. */
+function siteUrl(): string {
+  return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 }
 
 /* --------------------------------------------------------- reset password */
@@ -219,15 +297,35 @@ export async function resetPassword(
     };
   }
 
-  // TODO(backend): verify the token has not expired or been used, hash and
-  // store the new password, invalidate every existing session, and confirm
-  // by email.
-  await new Promise((r) => setTimeout(r, 500));
+  // Following the emailed link signs the browser in with a recovery session, so
+  // by the time this form is submitted there is a session to act on and
+  // `updateUser` is the whole operation. Supabase verifies the token's age and
+  // single use itself.
+  const supabase = supabaseServer();
+  const { data } = await supabase.auth.getUser();
+
+  if (!data.user) {
+    return {
+      status: "error",
+      message:
+        "This reset link has expired or has already been used. Request a new one from the forgot-password page.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    return {
+      status: "error",
+      message: "The password could not be changed. Request a new reset link and try again.",
+    };
+  }
 
   return {
     status: "success",
-    message:
-      "Your new password passed validation. Password reset is not live yet, so nothing has been changed.",
+    message: "Your password has been changed. You can sign in with it now.",
   };
 }
 
@@ -246,13 +344,20 @@ export async function resendVerification(
     };
   }
 
-  // TODO(backend): re-issue the verification token and send the email, rate
-  // limited per address.
-  await new Promise((r) => setTimeout(r, 500));
-
+  // Registration currently confirms addresses on creation (see `register`),
+  // because no mail provider is connected — so there is nothing outstanding to
+  // re-send, and calling Supabase would either fail or send a link that cannot
+  // be delivered. Saying so beats a success message the inbox contradicts.
+  //
+  // TODO(phase 6): with Resend connected, set `email_confirm: false` in
+  // `register` and make this call `supabase.auth.resend({ type: "signup", email })`,
+  // rate limited per address.
   return {
     status: "success",
     message:
-      "Email verification is not live yet, so nothing has been sent. This is where the new link would go out.",
+      "Email verification is not connected yet, so nothing has been sent — and nothing is waiting on it. Your account is already usable; sign in with the password you chose.",
   };
 }
+
+/* Sign-out is `src/app/logout/route.ts`, not an action here: the topbar's
+   control is a link, and a GET route keeps it working without JavaScript. */

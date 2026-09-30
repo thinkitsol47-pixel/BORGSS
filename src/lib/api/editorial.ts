@@ -1,30 +1,44 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
+import { db, isUuid } from "@/lib/db";
+import { isStoredFile } from "@/lib/storage";
+import { formatDate } from "@/lib/utils";
 import type {
   DecisionType,
   DoiRecord,
   EditorialIssue,
+  ReviewCriterion,
   ReviewerAvailability,
   ReviewerProfile,
   ReviewerReport,
+  ReviewScore,
   Submission,
   SubmissionStatus,
 } from "@/types";
-import { mockSubmissions } from "./mock-submissions";
-import { mockQueueSubmissions } from "./mock-queue-submissions";
-import { mockReviewers } from "./mock-reviewers";
-import { mockReports } from "./mock-reports";
-import { mockEditorialIssues, mockDoiRecords } from "./mock-issues";
+import { getSubmissionById, getSubmissionsForAuthor } from "./submissions";
 
 /**
  * Server-side data access for the editorial screens.
- * SCAFFOLD: reads mock data. Swap each body for a real query.
  *
- * Separate from `submissions.ts` because the questions are different. That
- * module answers "what is mine?"; this one answers "what is waiting, and who
- * is it waiting on?" — which is the whole job of an editorial queue.
+ * Phase 3: reads Postgres through Prisma. Separate from `submissions.ts`
+ * because the questions are different. That module answers "what is mine?";
+ * this one answers "what is waiting, and who is it waiting on?" — which is
+ * the whole job of an editorial queue.
  */
 
 export const QUEUE_PER_PAGE = 10;
+
+/**
+ * Prisma Client's generated enums are camelCase (`@map()` only renames the
+ * database column); `src/types` uses the kebab-case wire values the rest of
+ * the app was built against.
+ */
+function camelToKebab(value: string): string {
+  return value.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+}
+function kebabToCamel(value: string): string {
+  return value.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+}
 
 /**
  * Drafts never appear. An author still filling in the wizard has not submitted
@@ -35,16 +49,133 @@ function editorVisible(s: Submission) {
   return s.status !== "draft";
 }
 
+/**
+ * The full shape a `Submission` is assembled from, reused unmodified from
+ * `submissions.ts` — every editorial page renders the same `Submission`
+ * shape the author's own pages do, just for every author rather than one.
+ */
+const submissionInclude = {
+  section: true,
+  contributors: {
+    include: { affiliations: { include: { affiliation: true } } },
+    orderBy: { position: "asc" },
+  },
+  files: { orderBy: { round: "asc" } },
+  decisions: { include: { decidedBy: true }, orderBy: { decidedAt: "asc" } },
+  messages: { include: { from: true }, orderBy: { sentAt: "asc" } },
+  assignments: { include: { reviewer: true }, orderBy: { invitedAt: "asc" } },
+} satisfies Prisma.SubmissionInclude;
+
+type SubmissionRow = Prisma.SubmissionGetPayload<{
+  include: typeof submissionInclude;
+}>;
+
+/**
+ * Maps a row to `Submission`, identically to `submissions.ts`'s own mapper.
+ *
+ * Not imported from there because that module does not export it — it is
+ * private to keep `getSubmissionsForAuthor` the one sanctioned way in, and
+ * duplicating ~60 lines here is cheaper than widening that module's surface
+ * for one shared helper. If a third file needs it, that is the point to
+ * factor it out into its own module.
+ */
+function toSubmission(row: SubmissionRow): Submission {
+  return {
+    id: row.id,
+    reference: row.reference,
+    title: row.title,
+    abstract: row.abstract,
+    keywords: row.keywords,
+    type: camelToKebab(row.type) as Submission["type"],
+    section: row.section.name,
+    contributors: row.contributors.map((c) => ({
+      id: c.id,
+      givenName: c.givenName,
+      familyName: c.familyName,
+      orcid: c.orcid ?? undefined,
+      isCorresponding: c.isCorresponding,
+      email: c.email ?? undefined,
+      affiliations: c.affiliations.map((ca) => ({
+        id: ca.affiliation.id,
+        name: ca.affiliation.name,
+        city: ca.affiliation.city ?? undefined,
+        country: ca.affiliation.country ?? undefined,
+        ror: ca.affiliation.ror ?? undefined,
+      })),
+    })),
+    submittedById: row.submittedById,
+    status: camelToKebab(row.status) as SubmissionStatus,
+    round: row.round,
+    submittedAt: row.submittedAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    revisionDueAt: row.revisionDueAt?.toISOString(),
+    files: row.files.map((f) => ({
+      id: f.id,
+      kind: camelToKebab(f.kind) as Submission["files"][number]["kind"],
+      filename: f.filename,
+      sizeBytes: Number(f.sizeBytes),
+      uploadedAt: f.uploadedAt.toISOString(),
+      round: f.round,
+      // The storage path stays in this layer; only whether it is real crosses
+      // into the UI. See `SubmissionFile.stored` in src/types.
+      stored: isStoredFile(f.storagePath),
+    })),
+    decisions: row.decisions.map((d) => ({
+      id: d.id,
+      type: camelToKebab(d.type) as DecisionType,
+      decidedAt: d.decidedAt.toISOString(),
+      decidedBy: d.decidedBy.name,
+      letter: d.letter,
+      round: d.round,
+    })),
+    messages: row.messages.map((m) => ({
+      id: m.id,
+      sentAt: m.sentAt.toISOString(),
+      from: m.from.name,
+      fromRole: m.fromRole as "author" | "editor",
+      subject: m.subject,
+      body: m.body,
+    })),
+    reviewAssignments: row.assignments.map((a) => {
+      const overdue =
+        a.status === "accepted" && a.dueAt !== null && a.dueAt < new Date();
+      return {
+        id: a.id,
+        reviewerName: a.reviewer.name,
+        label: a.label,
+        invitedAt: a.invitedAt.toISOString(),
+        respondedAt: a.respondedAt?.toISOString(),
+        dueAt: a.dueAt?.toISOString(),
+        completedAt: a.completedAt?.toISOString(),
+        status: overdue ? "overdue" : a.status,
+        round: a.round,
+      };
+    }),
+    articleId: row.articleId ?? undefined,
+  };
+}
+
 /** Everything in the workflow, from every author. */
 export async function getAllSubmissions(): Promise<Submission[]> {
-  return [...mockSubmissions, ...mockQueueSubmissions].filter(editorVisible);
+  const rows = await db.submission.findMany({
+    where: { status: { not: "draft" } },
+    include: submissionInclude,
+    orderBy: { updatedAt: "asc" },
+  });
+  return rows.map(toSubmission).filter(editorVisible);
 }
 
 export async function getEditorialSubmissionById(
   id: string,
 ): Promise<Submission | null> {
-  const all = await getAllSubmissions();
-  return all.find((s) => s.id === id) ?? null;
+  if (!isUuid(id)) return null;
+  const row = await db.submission.findUnique({
+    where: { id },
+    include: submissionInclude,
+  });
+  if (!row) return null;
+  const submission = toSubmission(row);
+  return editorVisible(submission) ? submission : null;
 }
 
 /* ------------------------------------------------------------------ *
@@ -95,7 +226,10 @@ export const WAITING_ON_LABEL: Record<WaitingOn, string> = {
 /** Review progress for the manuscript's current round. */
 export function roundProgress(s: Submission) {
   const thisRound = s.reviewAssignments.filter((r) => r.round === s.round);
-  const active = thisRound.filter((r) => r.status !== "declined");
+  // A declined or withdrawn assignment is not a report the round is waiting on.
+  const active = thisRound.filter(
+    (r) => r.status !== "declined" && r.status !== "withdrawn",
+  );
   const completed = thisRound.filter((r) => r.status === "completed");
   const overdue = thisRound.filter((r) => r.status === "overdue");
   return {
@@ -266,10 +400,95 @@ export type ReviewerQuery = {
   page?: number;
 };
 
+const reviewerProfileInclude = {
+  user: true,
+} satisfies Prisma.ReviewerProfileInclude;
+
+type ReviewerProfileRow = Prisma.ReviewerProfileGetPayload<{
+  include: typeof reviewerProfileInclude;
+}>;
+
+/**
+ * `ReviewerProfile` (the type) carries lifetime stats — completed, declined,
+ * unanswered, average turnaround, last reviewed — that are not columns on
+ * `ReviewerProfile` (the table); they are computed from every
+ * `ReviewAssignment` naming that user as reviewer. One query per reviewer
+ * would be N+1 on a directory page, so `listReviewers` fetches every
+ * assignment for the whole pool once and this function reduces over it.
+ */
+function toReviewerProfile(
+  row: ReviewerProfileRow,
+  assignments: { status: string; invitedAt: Date; completedAt: Date | null }[],
+): ReviewerProfile {
+  const completed = assignments.filter((a) => a.status === "completed");
+  const declined = assignments.filter((a) => a.status === "declined");
+  // AssignmentStatus has no "unanswered" state of its own — an invitation
+  // nobody has responded to is still "invited". The directory's definition of
+  // "unanswered" (worth seeing before inviting someone again) is exactly that.
+  const unanswered = assignments.filter((a) => a.status === "invited");
+  const active = assignments.filter(
+    (a) => a.status === "invited" || a.status === "accepted",
+  );
+
+  const turnarounds = completed
+    .filter((a) => a.completedAt !== null)
+    .map((a) => Math.round((+a.completedAt! - +a.invitedAt) / 86_400_000));
+  const averageTurnaroundDays = turnarounds.length
+    ? Math.round(turnarounds.reduce((a, b) => a + b, 0) / turnarounds.length)
+    : null;
+
+  const lastReviewedAt = completed.length
+    ? completed
+        .map((a) => a.completedAt!.toISOString())
+        .sort()
+        .slice(-1)[0]
+    : undefined;
+
+  return {
+    id: row.id,
+    /** The `User` id — what a `ReviewAssignment` points at. */
+    userId: row.userId,
+    name: row.user.name,
+    email: row.user.email,
+    affiliation: row.user.affiliation ?? "",
+    country: row.user.country ?? "",
+    orcid: row.user.orcid ?? undefined,
+    expertise: row.expertise,
+    sections: row.sections,
+    availability: camelToKebab(row.availability) as ReviewerAvailability,
+    unavailableUntil: row.unavailableUntil?.toISOString(),
+    activeReviews: active.length,
+    completed: completed.length,
+    declined: declined.length,
+    unanswered: unanswered.length,
+    averageTurnaroundDays,
+    lastReviewedAt,
+  };
+}
+
 export async function listReviewers(query: ReviewerQuery = {}) {
   const { q, section, availability, sort = "name", page = 1 } = query;
 
-  let items: ReviewerProfile[] = [...mockReviewers];
+  const rows = await db.reviewerProfile.findMany({
+    include: reviewerProfileInclude,
+  });
+
+  // One query for every assignment naming any reviewer in the pool, grouped
+  // by reviewer afterwards — the N+1 this file exists to avoid.
+  const allAssignments = await db.reviewAssignment.findMany({
+    where: { reviewerId: { in: rows.map((r) => r.userId) } },
+    select: { reviewerId: true, status: true, invitedAt: true, completedAt: true },
+  });
+  const byReviewer = new Map<string, typeof allAssignments>();
+  for (const a of allAssignments) {
+    const list = byReviewer.get(a.reviewerId) ?? [];
+    list.push(a);
+    byReviewer.set(a.reviewerId, list);
+  }
+
+  let items = rows.map((r) =>
+    toReviewerProfile(r, byReviewer.get(r.userId) ?? []),
+  );
 
   if (availability) {
     items = items.filter((r) => r.availability === availability);
@@ -327,6 +546,28 @@ function sortReviewers(items: ReviewerProfile[], sort: ReviewerSort) {
   }
 }
 
+/**
+ * Every `ReviewerProfile` row, unpaginated and unfiltered — for
+ * `getReviewerMatches`, which has to rank the whole pool against one
+ * manuscript rather than one page of it.
+ */
+async function getAllReviewerProfiles(): Promise<ReviewerProfile[]> {
+  const rows = await db.reviewerProfile.findMany({
+    include: reviewerProfileInclude,
+  });
+  const allAssignments = await db.reviewAssignment.findMany({
+    where: { reviewerId: { in: rows.map((r) => r.userId) } },
+    select: { reviewerId: true, status: true, invitedAt: true, completedAt: true },
+  });
+  const byReviewer = new Map<string, typeof allAssignments>();
+  for (const a of allAssignments) {
+    const list = byReviewer.get(a.reviewerId) ?? [];
+    list.push(a);
+    byReviewer.set(a.reviewerId, list);
+  }
+  return rows.map((r) => toReviewerProfile(r, byReviewer.get(r.userId) ?? []));
+}
+
 /* ------------------------------------------------------------------ *
  * Decisions — the reports behind one, and what it may be.
  * ------------------------------------------------------------------ */
@@ -337,14 +578,46 @@ function sortReviewers(items: ReviewerProfile[], sort: ReviewerSort) {
  * Loaded here and never from a submission-shaped function, because
  * `Submission` is what author-facing screens render: keeping the report bodies
  * out of that object is what stops one from reaching an author by oversight.
+ * The query below never selects `Submission.contributors` or anything
+ * author-identifying — only report bodies and the reviewer/assignment fields
+ * an editor is allowed to see.
  */
 export async function getReportsForSubmission(
   submissionId: string,
 ): Promise<ReviewerReport[]> {
-  return mockReports
-    .filter((r) => r.submissionId === submissionId)
+  if (!isUuid(submissionId)) return [];
+
+  const rows = await db.reviewerReport.findMany({
+    where: { submissionId },
+    include: { assignment: { include: { reviewer: true } } },
+  });
+
+  return rows
+    .map(
+      (r): ReviewerReport => ({
+        id: r.id,
+        assignmentId: r.assignmentId,
+        submissionId: r.submissionId,
+        reviewerName: r.assignment.reviewer.name,
+        label: r.assignment.label,
+        round: r.round,
+        body: {
+          scores: r.scores as Record<ReviewCriterion, ReviewScore>,
+          recommendation: camelToKebab(
+            r.recommendation,
+          ) as ReviewSubmissionBodyRecommendation,
+          commentsToAuthor: r.commentsToAuthor,
+          commentsToEditor: r.commentsToEditor,
+          concernsRaised: r.concernsRaised ?? undefined,
+          submittedAt: r.submittedAt.toISOString(),
+        },
+      }),
+    )
     .sort((a, b) => a.round - b.round || a.label.localeCompare(b.label));
 }
+
+// Narrow alias purely so the mapper above reads without a long inline type.
+type ReviewSubmissionBodyRecommendation = ReviewerReport["body"]["recommendation"];
 
 /**
  * What the editor knows before writing a letter.
@@ -378,6 +651,7 @@ export async function getDecisionContext(
       (a) =>
         a.round === submission.round &&
         a.status !== "declined" &&
+        a.status !== "withdrawn" &&
         !reported.has(a.id),
     )
     .map((a) => ({
@@ -439,14 +713,49 @@ export function decisionBlockedReason(s: Submission): string | null {
  * Issues in preparation.
  * ------------------------------------------------------------------ */
 
+const editorialIssueInclude = {
+  items: { include: { submission: true }, orderBy: { position: "asc" } },
+} satisfies Prisma.EditorialIssueInclude;
+
+type EditorialIssueRow = Prisma.EditorialIssueGetPayload<{
+  include: typeof editorialIssueInclude;
+}>;
+
+function toEditorialIssue(row: EditorialIssueRow): EditorialIssue {
+  return {
+    id: row.id,
+    volume: row.volume,
+    number: row.number,
+    year: row.year,
+    title: row.title ?? undefined,
+    state: camelToKebab(row.state) as EditorialIssue["state"],
+    targetDate: row.targetDate.toISOString(),
+    publishedAt: row.publishedAt?.toISOString(),
+    plannedArticles: row.plannedArticles ?? undefined,
+    items: row.items.map((it) => ({
+      submissionId: it.submissionId,
+      position: it.position,
+      // No page-numbering field exists yet on IssuePlanItem — production has
+      // no "assign pages" step in the schema. Left undefined rather than
+      // guessed; the type already treats this as optional for exactly this
+      // reason (pages are set only once production has assigned them).
+      pages: undefined,
+    })),
+    slug: row.slug ?? undefined,
+  };
+}
+
 /** Newest first, and the issue being assembled comes before the published. */
 export async function listEditorialIssues(): Promise<EditorialIssue[]> {
+  const rows = await db.editorialIssue.findMany({
+    include: editorialIssueInclude,
+  });
   const order: Record<EditorialIssue["state"], number> = {
     planned: 0,
     "in-production": 1,
     published: 2,
   };
-  return [...mockEditorialIssues].sort(
+  return rows.map(toEditorialIssue).sort(
     (a, b) =>
       order[a.state] - order[b.state] ||
       b.year - a.year ||
@@ -458,7 +767,12 @@ export async function listEditorialIssues(): Promise<EditorialIssue[]> {
 export async function getEditorialIssueById(
   id: string,
 ): Promise<EditorialIssue | null> {
-  return mockEditorialIssues.find((i) => i.id === id) ?? null;
+  if (!isUuid(id)) return null;
+  const row = await db.editorialIssue.findUnique({
+    where: { id },
+    include: editorialIssueInclude,
+  });
+  return row ? toEditorialIssue(row) : null;
 }
 
 export function issueLabel(i: EditorialIssue): string {
@@ -470,16 +784,20 @@ export function issueLabel(i: EditorialIssue): string {
  *
  * A placed submission that cannot be found is returned as null rather than
  * dropped, so a broken placement shows as a gap in the table of contents
- * instead of silently shortening it.
+ * instead of silently shortening it. In practice the foreign key makes that
+ * impossible now (a `IssuePlanItem` cannot outlive its `Submission`), but the
+ * shape is kept — a submission an editor is not allowed to see would look
+ * identical from here, and the page's handling of that case still matters.
  */
 export async function getIssueContents(issue: EditorialIssue) {
-  const all = [...mockSubmissions, ...mockQueueSubmissions];
-  return [...issue.items]
-    .sort((a, b) => a.position - b.position)
-    .map((item) => ({
-      item,
-      submission: all.find((s) => s.id === item.submissionId) ?? null,
-    }));
+  return Promise.all(
+    [...issue.items]
+      .sort((a, b) => a.position - b.position)
+      .map(async (item) => ({
+        item,
+        submission: await getEditorialSubmissionById(item.submissionId),
+      })),
+  );
 }
 
 /**
@@ -489,9 +807,10 @@ export async function getIssueContents(issue: EditorialIssue) {
  * is as much a part of planning an issue as what is already in it.
  */
 export async function getUnscheduledAccepted(): Promise<Submission[]> {
-  const placed = new Set(
-    mockEditorialIssues.flatMap((i) => i.items.map((it) => it.submissionId)),
-  );
+  const placedRows = await db.issuePlanItem.findMany({
+    select: { submissionId: true },
+  });
+  const placed = new Set(placedRows.map((r) => r.submissionId));
   const all = await getAllSubmissions();
   return all.filter(
     (s) =>
@@ -504,37 +823,74 @@ export async function getUnscheduledAccepted(): Promise<Submission[]> {
  * DOI register.
  * ------------------------------------------------------------------ */
 
+const doiRecordInclude = {
+  article: { include: { issue: true } },
+} satisfies Prisma.DoiRecordInclude;
+
+type DoiRecordRow = Prisma.DoiRecordGetPayload<{
+  include: typeof doiRecordInclude;
+}>;
+
+function toDoiRecord(row: DoiRecordRow): DoiRecord {
+  return {
+    id: row.id,
+    doi: row.doi,
+    articleId: row.articleId,
+    articleSlug: row.article.slug,
+    articleTitle: row.article.title,
+    issueLabel: row.article.issue
+      ? `Vol. ${row.article.issue.volume}, No. ${row.article.issue.number} (${row.article.issue.year})`
+      : `Vol. ${row.article.volume}, No. ${row.article.issueNumber}`,
+    state: camelToKebab(row.state) as DoiRecord["state"],
+    lastAttemptAt: row.lastAttemptAt?.toISOString(),
+    registeredAt: row.registeredAt?.toISOString(),
+    failureReason: row.failureReason ?? undefined,
+    attempts: row.attempts,
+  };
+}
+
 export async function listDoiRecords(state?: DoiRecord["state"]) {
-  const items = state
-    ? mockDoiRecords.filter((r) => r.state === state)
-    : [...mockDoiRecords];
+  const rows = await db.doiRecord.findMany({ include: doiRecordInclude });
+  const items = rows.map(toDoiRecord);
+  const filtered = state ? items.filter((r) => r.state === state) : items;
 
   const counts = {
-    total: mockDoiRecords.length,
-    registered: mockDoiRecords.filter((r) => r.state === "registered").length,
-    pending: mockDoiRecords.filter((r) => r.state === "pending").length,
-    failed: mockDoiRecords.filter((r) => r.state === "failed").length,
-    notDeposited: mockDoiRecords.filter((r) => r.state === "not-deposited")
-      .length,
+    total: items.length,
+    registered: items.filter((r) => r.state === "registered").length,
+    pending: items.filter((r) => r.state === "pending").length,
+    failed: items.filter((r) => r.state === "failed").length,
+    notDeposited: items.filter((r) => r.state === "not-deposited").length,
   };
 
-  return { items, counts };
+  return { items: filtered, counts };
 }
 
 /**
- * Whether the journal holds a Crossref prefix.
+ * Whether every DOI on record is a real one.
+ *
+ * **Not the same question as `hasRealDoiPrefix()`** in `journal-settings.ts`,
+ * which asks whether a prefix has been *entered*. This asks whether the DOIs
+ * already minted use it. The two differ for exactly as long as it takes to
+ * re-mint the placeholders after a prefix arrives, and that gap is worth being
+ * able to see: a journal with a prefix but unmigrated DOIs still has articles
+ * whose DOIs resolve nowhere.
  *
  * Derived from the data rather than hard-coded to false, so this stops
- * reporting "no prefix" the moment real DOIs are entered. The placeholder in
- * `mock-data.ts` is literally `10.xxxxx`, which no registry would ever issue.
+ * reporting "no prefix" the moment real DOIs are entered. The placeholder
+ * DOIs are literally `10.xxxxx`, which no registry would ever issue.
  */
-export function hasCrossrefPrefix(): boolean {
-  return !mockDoiRecords.some((r) => r.doi.startsWith("10.xxxxx"));
+export async function hasCrossrefPrefix(): Promise<boolean> {
+  const placeholder = await db.doiRecord.findFirst({
+    where: { doi: { startsWith: "10.xxxxx" } },
+    select: { id: true },
+  });
+  return placeholder === null;
 }
 
 /** Sections present in the reviewer pool, for the filter bar. */
-export function getReviewerSections(): string[] {
-  return [...new Set(mockReviewers.flatMap((r) => r.sections))].sort();
+export async function getReviewerSections(): Promise<string[]> {
+  const rows = await db.reviewerProfile.findMany({ select: { sections: true } });
+  return [...new Set(rows.flatMap((r) => r.sections))].sort();
 }
 
 /* ------------------------------------------------------------------ *
@@ -567,16 +923,22 @@ export type ReviewerMatch = {
 export async function getReviewerMatches(
   submission: Submission,
 ): Promise<ReviewerMatch[]> {
+  const reviewers = await getAllReviewerProfiles();
+
   const authorAffiliations = new Set(
     submission.contributors.flatMap((c) =>
       c.affiliations.map((a) => a.name.toLowerCase()),
     ),
   );
+  // A withdrawn invitation does not count — the editor can approach that
+  // reviewer again.
   const assigned = new Set(
-    submission.reviewAssignments.map((r) => r.reviewerName),
+    submission.reviewAssignments
+      .filter((r) => r.status !== "withdrawn")
+      .map((r) => r.reviewerName),
   );
 
-  const matches: ReviewerMatch[] = mockReviewers.map((reviewer) => {
+  const matches: ReviewerMatch[] = reviewers.map((reviewer) => {
     const matchedKeywords = submission.keywords.filter((k) =>
       reviewer.expertise.some(
         (e) =>
@@ -596,8 +958,12 @@ export async function getReviewerMatches(
     if (sharedAffiliation) {
       conflict = "Shares an affiliation with an author";
     } else if (reviewer.availability === "unavailable") {
+      // Through `formatDate`, not interpolated raw: `unavailableUntil` is an
+      // ISO timestamp, so the screen was printing
+      // "Unavailable until 2026-11-30T00:00:00.000Z" at an editor deciding who
+      // to invite. Every other date in the portal reads "30 November 2026".
       conflict = reviewer.unavailableUntil
-        ? `Unavailable until ${reviewer.unavailableUntil}`
+        ? `Unavailable until ${formatDate(reviewer.unavailableUntil)}`
         : "Currently unavailable";
     }
 
@@ -628,3 +994,9 @@ export async function getReviewerMatches(
     return a.reviewer.name.localeCompare(b.reviewer.name);
   });
 }
+
+// Re-exported so callers that only need "does this author have other
+// submissions" (e.g. a conflict check) are not forced to import
+// submissions.ts directly for one function. Not currently used within this
+// file; kept for parity with what editorial pages have reached for before.
+export { getSubmissionsForAuthor, getSubmissionById };

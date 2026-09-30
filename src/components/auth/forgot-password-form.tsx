@@ -42,9 +42,10 @@ export function ForgotPasswordForm() {
         new password.
       </AuthHeading>
 
-      <ScaffoldNotice>
-        Password reset is not live yet. This form validates the address but
-        sends no email.
+      <ScaffoldNotice title="A reset link may not arrive">
+        Password reset itself works, but email delivery is still being set up,
+        so a link may be delayed or may not reach you at all. If nothing comes
+        within a few minutes, contact the editorial office.
       </ScaffoldNotice>
 
       <form action={formAction} className="space-y-5" noValidate>

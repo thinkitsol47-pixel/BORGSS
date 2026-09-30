@@ -1,20 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Field, Input, Select } from "@/components/ui";
+import { useFormState } from "react-dom";
+import { Alert, Button, Field, Input, Select } from "@/components/ui";
 import { COUNTRIES } from "@/config/countries";
+import {
+  saveJournalIdentity,
+  type SettingsState,
+} from "@/app/(dashboard)/admin/settings/actions";
 
 /**
- * The journal's identity, as an editable form.
+ * The journal's identity.
  *
- * UI ONLY. Nothing is saved — these values live in `src/config/site.config.ts`
- * and a deployed app cannot write its own source. The form is the interface the
- * backend will attach to; until then Save says so rather than pretending.
+ * **Twelve fields save; nine are shown read-only.** The editable ones are the
+ * facts a journal *acquires* — an ISSN when it is issued, a Crossref prefix
+ * when membership starts, an office address once there is one — and an
+ * administrator should not need a deploy to record any of them.
  *
- * The three identifiers get their own section and lead the form, because they
- * are the fields that block a DOAJ application and the only reason to open
- * this screen with intent.
+ * The rest are decisions, not settings: the journal's name, its licence, its
+ * access model. Changing one changes the journal rather than its
+ * configuration, and belongs in a commit someone reviewed alongside the pages
+ * that would have to change with it. They are rendered so this screen still
+ * shows the whole identity, and disabled so it cannot imply otherwise.
+ *
+ * The three identifiers lead the form because they are what blocks a DOAJ
+ * application, and the only reason to open this screen with intent.
  */
+
+const initialState: SettingsState = { status: "idle" };
 export function JournalSettingsForm({
   values,
 }: {
@@ -42,15 +54,22 @@ export function JournalSettingsForm({
     facebook: string;
   };
 }) {
-  const [saved, setSaved] = useState(false);
-
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSaved(true);
-  }
+  const [state, formAction] = useFormState(saveJournalIdentity, initialState);
+  const v = state.values ?? {};
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form action={formAction} className="space-y-8" noValidate>
+      {state.status === "error" && state.message && (
+        <Alert tone="danger" title="Could not save">
+          {state.message}
+        </Alert>
+      )}
+      {state.status === "success" && state.message && (
+        <Alert tone="success" title="Saved">
+          {state.message}
+        </Alert>
+      )}
+
       {/* --------------------------------------------------- identifiers */}
       <section>
         <h2 className="font-serif text-lg font-semibold">Identifiers</h2>
@@ -65,11 +84,12 @@ export function JournalSettingsForm({
             htmlFor="issn"
             optional
             hint="Applied for through the national ISSN centre."
+            error={state.errors?.issn}
           >
             <Input
               id="issn"
               name="issn"
-              defaultValue={values.issn}
+              defaultValue={v.issn ?? values.issn}
               placeholder="2789-1234"
             />
           </Field>
@@ -79,11 +99,12 @@ export function JournalSettingsForm({
             htmlFor="eIssn"
             optional
             hint="The one that matters for an online-only journal, and for DOAJ."
+            error={state.errors?.eIssn}
           >
             <Input
               id="eIssn"
               name="eIssn"
-              defaultValue={values.eIssn}
+              defaultValue={v.eIssn ?? values.eIssn}
               placeholder="2789-5678"
             />
           </Field>
@@ -93,11 +114,12 @@ export function JournalSettingsForm({
             htmlFor="doiPrefix"
             hint="No registry issues 10.xxxxx — that is the placeholder standing in for a real prefix."
             className="sm:col-span-2"
+            error={state.errors?.doiPrefix}
           >
             <Input
               id="doiPrefix"
               name="doiPrefix"
-              defaultValue={values.doiPrefix}
+              defaultValue={v.doiPrefix ?? values.doiPrefix}
               placeholder="10.12345"
             />
           </Field>
@@ -119,6 +141,7 @@ export function JournalSettingsForm({
           >
             <Input
               id="shortName"
+              disabled
               name="shortName"
               defaultValue={values.shortName}
             />
@@ -136,6 +159,7 @@ export function JournalSettingsForm({
           >
             <textarea
               id="description"
+              disabled
               name="description"
               rows={3}
               defaultValue={values.description}
@@ -152,6 +176,7 @@ export function JournalSettingsForm({
           <Field label="Publisher" htmlFor="publisher" className="sm:col-span-2">
             <Input
               id="publisher"
+              disabled
               name="publisher"
               defaultValue={values.publisher}
             />
@@ -163,6 +188,7 @@ export function JournalSettingsForm({
           <Field label="Country of publication" htmlFor="countryOfPublication">
             <Input
               id="countryOfPublication"
+              disabled
               name="countryOfPublication"
               defaultValue={values.countryOfPublication}
               list="journal-country-options"
@@ -177,6 +203,7 @@ export function JournalSettingsForm({
           <Field label="Frequency" htmlFor="frequency">
             <Input
               id="frequency"
+              disabled
               name="frequency"
               defaultValue={values.frequency}
             />
@@ -189,6 +216,7 @@ export function JournalSettingsForm({
           >
             <Input
               id="language"
+              disabled
               name="language"
               defaultValue={values.language}
             />
@@ -197,6 +225,7 @@ export function JournalSettingsForm({
           <Field label="Access model" htmlFor="accessModel">
             <Select
               id="accessModel"
+              disabled
               name="accessModel"
               defaultValue={values.accessModel}
             >
@@ -218,39 +247,43 @@ export function JournalSettingsForm({
           today.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field label="Editorial office" htmlFor="editorialOffice">
+          <Field label="Editorial office" htmlFor="editorialOffice"
+            error={state.errors?.editorialOffice}>
             <Input
               id="editorialOffice"
               name="editorialOffice"
               type="email"
-              defaultValue={values.editorialOffice}
+              defaultValue={v.editorialOffice ?? values.editorialOffice}
             />
           </Field>
 
-          <Field label="Submissions" htmlFor="submissions">
+          <Field label="Submissions" htmlFor="submissions"
+            error={state.errors?.submissions}>
             <Input
               id="submissions"
               name="submissions"
               type="email"
-              defaultValue={values.submissions}
+              defaultValue={v.submissions ?? values.submissions}
             />
           </Field>
 
-          <Field label="Support" htmlFor="support">
+          <Field label="Support" htmlFor="support"
+            error={state.errors?.support}>
             <Input
               id="support"
               name="support"
               type="email"
-              defaultValue={values.support}
+              defaultValue={v.support ?? values.support}
             />
           </Field>
 
-          <Field label="Article charges" htmlFor="charges">
+          <Field label="Article charges" htmlFor="charges"
+            error={state.errors?.charges}>
             <Input
               id="charges"
               name="charges"
               type="email"
-              defaultValue={values.charges}
+              defaultValue={v.charges ?? values.charges}
             />
           </Field>
 
@@ -259,16 +292,18 @@ export function JournalSettingsForm({
             htmlFor="address"
             hint="A literal [city] is still in this value."
             className="sm:col-span-2"
+            error={state.errors?.address}
           >
-            <Input id="address" name="address" defaultValue={values.address} />
+            <Input id="address" name="address" defaultValue={v.address ?? values.address} />
           </Field>
 
-          <Field label="Telephone" htmlFor="phone" optional>
+          <Field label="Telephone" htmlFor="phone" optional
+            error={state.errors?.phone}>
             <Input
               id="phone"
               name="phone"
               type="tel"
-              defaultValue={values.phone}
+              defaultValue={v.phone ?? values.phone}
               placeholder="+92 21 1234567"
             />
           </Field>
@@ -283,29 +318,32 @@ export function JournalSettingsForm({
           showing icons that lead nowhere.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field label="X" htmlFor="x" optional>
+          <Field label="X" htmlFor="x" optional
+            error={state.errors?.x}>
             <Input
               id="x"
               name="x"
-              defaultValue={values.x}
+              defaultValue={v.x ?? values.x}
               placeholder="https://x.com/…"
             />
           </Field>
 
-          <Field label="LinkedIn" htmlFor="linkedin" optional>
+          <Field label="LinkedIn" htmlFor="linkedin" optional
+            error={state.errors?.linkedin}>
             <Input
               id="linkedin"
               name="linkedin"
-              defaultValue={values.linkedin}
+              defaultValue={v.linkedin ?? values.linkedin}
               placeholder="https://linkedin.com/company/…"
             />
           </Field>
 
-          <Field label="Facebook" htmlFor="facebook" optional>
+          <Field label="Facebook" htmlFor="facebook" optional
+            error={state.errors?.facebook}>
             <Input
               id="facebook"
               name="facebook"
-              defaultValue={values.facebook}
+              defaultValue={v.facebook ?? values.facebook}
               placeholder="https://facebook.com/…"
             />
           </Field>
@@ -318,10 +356,10 @@ export function JournalSettingsForm({
         <Button href="/dashboard" variant="outline">
           Cancel
         </Button>
-        <p className="text-xs text-muted-foreground" aria-live="polite">
-          {saved
-            ? "Nothing was saved — these values live in site.config.ts and there is no database yet."
-            : "Nothing is saved yet — there is no database."}
+        <p className="text-xs text-muted-foreground">
+          The identifiers, contact addresses and social links are saved. The
+          greyed fields above are set in{" "}
+          <code className="font-mono text-[0.95em]">src/config/site.config.ts</code>.
         </p>
       </div>
     </form>

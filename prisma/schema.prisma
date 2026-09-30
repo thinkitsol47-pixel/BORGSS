@@ -1,0 +1,1076 @@
+// BORJSS — database schema
+//
+// Derived from `src/types/index.ts`, which the whole frontend already reads.
+// `docs/BACKEND-STRUCTURE.md` is the design document: it explains why each
+// shape is what it is, and any change here should be argued against it.
+//
+// Two things this schema adds that the types do not have, both deliberate:
+//
+//   1. `Section` is a table. A submission's section was a plain string, which
+//      is how "Gender Studies" came to sit on manuscripts when the declared
+//      name is "Gender & Development". A foreign key makes that impossible
+//      rather than merely visible on /admin/settings/sections.
+//
+//   2. `ReviewForm` is versioned, and every report records which version
+//      scored it. Criteria are the axis reports are compared on; change the
+//      list and old reports stop being comparable with new ones, while an
+//      editor reads them side by side believing otherwise.
+//
+// Timestamps are all `DateTime` (timestamptz in Postgres). A journal has
+// authors and reviewers in every time zone, and a due date that means a
+// different moment depending on who reads it is an unfair deadline.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Connection URLs live in `prisma.config.ts`, not here — Prisma 7 moved them
+// out of the schema so the same schema can be pointed at a different database
+// without being edited.
+datasource db {
+  provider = "postgresql"
+}
+
+/* ------------------------------------------------------------------ *
+ * ENUMS — mirrored from src/types/index.ts.
+ *
+ * Kept as database enums rather than free strings so a value the app does
+ * not know cannot be written by any path.
+ * ------------------------------------------------------------------ */
+
+enum Role {
+  superAdmin
+  admin
+  journalManager
+  editorInChief
+  managingEditor
+  sectionEditor
+  editorialBoard
+  reviewer
+  author
+  copyeditor
+  layoutEditor
+  proofreader
+}
+
+enum AccountStatus {
+  active
+  invited
+  suspended
+}
+
+enum ArticleType {
+  research
+  review
+  caseStudy    @map("case-study")
+  editorial
+  conceptual
+  bookReview   @map("book-review")
+}
+
+/// Ordered as the author experiences it. `deskRejected` is separate from
+/// `rejected` because a desk rejection never reaches a reviewer, and the
+/// author needs to see which happened.
+enum SubmissionStatus {
+  draft
+  submitted
+  deskReview          @map("desk-review")
+  underReview         @map("under-review")
+  awaitingDecision    @map("awaiting-decision")
+  revisionRequested   @map("revision-requested")
+  revisionSubmitted   @map("revision-submitted")
+  accepted
+  inProduction        @map("in-production")
+  published
+  deskRejected        @map("desk-rejected")
+  rejected
+  withdrawn
+}
+
+enum DecisionType {
+  accept
+  minorRevision @map("minor-revision")
+  majorRevision @map("major-revision")
+  reject
+  deskReject    @map("desk-reject")
+}
+
+enum SubmissionFileKind {
+  manuscript
+  titlePage            @map("title-page")
+  coverLetter          @map("cover-letter")
+  figure
+  table
+  supplementary
+  responseToReviewers  @map("response-to-reviewers")
+}
+
+/// `overdue` is NOT stored — it is `accepted` with a `dueAt` in the past.
+/// Storing it would need a nightly job that can fail and leave the queue lying.
+///
+/// `withdrawn` IS stored, unlike `overdue`: an editor who pulled an invitation
+/// needs the next editor to see that the reviewer was approached and then
+/// released, not a blank that reads as "never asked". The row stays, greyed.
+enum AssignmentStatus {
+  invited
+  accepted
+  declined
+  completed
+  withdrawn
+}
+
+enum ReviewRecommendation {
+  accept
+  minorRevision @map("minor-revision")
+  majorRevision @map("major-revision")
+  reject
+}
+
+enum ReviewerAvailability {
+  available
+  unavailable
+  overloaded
+}
+
+enum IssueState {
+  planned
+  inProduction @map("in-production")
+  published
+}
+
+enum ProductionStage {
+  copyedit
+  galleys
+  proofread
+}
+
+/// `withAuthor` is a state, not a flag on `inProgress`. A stage sitting with
+/// the author is production doing nothing while the clock runs, and it is the
+/// commonest reason an issue slips — so it has to be filterable.
+enum StageState {
+  notStarted  @map("not-started")
+  inProgress  @map("in-progress")
+  withAuthor  @map("with-author")
+  done
+}
+
+enum GalleyFormat {
+  pdf
+  xml
+  html
+  epub
+}
+
+enum DepositState {
+  registered
+  pending
+  failed
+  notDeposited @map("not-deposited")
+}
+
+enum PostKind {
+  announcement
+  news
+  event
+}
+
+enum AnnouncementCategory {
+  callForPapers @map("call-for-papers")
+  policyUpdate  @map("policy-update")
+  issueRelease  @map("issue-release")
+  general
+}
+
+enum BoardCategory {
+  editorInChief   @map("editor-in-chief")
+  managingEditor  @map("managing-editor")
+  associateEditor @map("associate-editor")
+  sectionEditor   @map("section-editor")
+  advisoryBoard   @map("advisory-board")
+  editorialBoard  @map("editorial-board")
+}
+
+/* ================================================================== *
+ * IDENTITY
+ * ================================================================== */
+
+/// `id` is the Supabase `auth.users` id, not a separate key. Deciding that
+/// now rather than in Phase 2 avoids a migration once accounts exist.
+///
+/// Accounts are **suspended, never deleted**. A suspended account still owns
+/// submissions and appears in the decision history of manuscripts it touched,
+/// so deleting one breaks the record. Nothing cascades from here.
+model User {
+  id              String        @id @db.Uuid
+  name            String
+  email           String        @unique
+  affiliation     String?
+  /// Department or school within the institution. Optional — plenty of
+  /// affiliations have no meaningful subdivision.
+  department      String?
+  /// "Associate Professor", "PhD candidate". What the person calls themselves.
+  position        String?
+  country         String?
+  orcid           String?
+  /// The account's own short biography, written by them. Shown to editors
+  /// choosing reviewers and never to authors.
+  ///
+  /// Deliberately NOT `ReviewerProfile.note`: that is an editor's private
+  /// assessment of a reviewer ("thorough on quantitative methods"), written by
+  /// someone else about them. Merging the two would let a reviewer read, and
+  /// eventually edit, an editor's notes on their own work.
+  bio             String?
+  status          AccountStatus @default(invited)
+  /// Required whenever status is `suspended`. A suspension nobody can explain
+  /// later is not defensible against an appeal.
+  suspendedReason String?
+  createdAt       DateTime      @default(now())
+  /// Null means never signed in — /admin/users prints "Never", not a dash,
+  /// because a dash reads as missing data rather than as a fact.
+  lastActiveAt    DateTime?
+
+  /// Which emails this account wants. Six columns rather than one JSON blob:
+  /// each is a real named setting worth documenting, and a typo in a JSON key
+  /// would silently mean "off" where a wrong column name is a compile error.
+  ///
+  /// The defaults match what /profile/notifications ships checked — on for
+  /// anything tied to a deadline, off for anything promotional.
+  ///
+  /// **Not every message has a switch here.** Decision letters, revision
+  /// requests and account-security mail are sent regardless; an account that
+  /// can silence its own decision letter is an account that misses its own
+  /// deadlines. The page says so rather than implying everything is optional.
+  notifySubmissionStatus  Boolean @default(true)
+  notifyEditorialMessages Boolean @default(true)
+  notifyNewInvitations    Boolean @default(true)
+  notifyReviewReminders   Boolean @default(true)
+  notifyIssuePublished    Boolean @default(false)
+  notifyJournalNews       Boolean @default(false)
+
+  roles            UserRole[]
+  reviewerProfile  ReviewerProfile?
+  submissions      Submission[]         @relation("SubmittedBy")
+  decisions        SubmissionDecision[]
+  messages         SubmissionMessage[]
+  assignments      ReviewAssignment[]
+  productionStages ProductionStageRecord[]
+  auditEntries     AuditEntry[]
+
+  @@index([status])
+}
+
+/// A row per role, not an array column. Roles are additive: an account holding
+/// three has the union of their permissions, never less.
+///
+/// `src/config/roles.ts` stays the source of truth for the permission matrix —
+/// /admin/roles renders that matrix from PERMISSIONS, so it cannot drift from
+/// what the app enforces.
+model UserRole {
+  userId String @db.Uuid
+  role   Role
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+  @@index([role])
+}
+
+/// Separate from `User`, deliberately. A reviewer profile is a *pool entry* —
+/// expertise, availability, turnaround — existing so an editor can choose
+/// someone. An account is the login. Merging them would put review turnaround
+/// on the screen where roles are granted.
+///
+/// The six counters the UI shows (activeReviews, completed, declined,
+/// unanswered, averageTurnaroundDays, lastReviewedAt) are **derived from
+/// ReviewAssignment rows, never stored**. Two sources for one fact is one too
+/// many, and a stored counter drifts the first time an update fails halfway.
+model ReviewerProfile {
+  id               String               @id @default(uuid()) @db.Uuid
+  userId           String               @unique @db.Uuid
+  /// Subject areas, matched against a manuscript's keywords.
+  expertise        String[]
+  /// Sections they normally review for.
+  sections         String[]
+  availability     ReviewerAvailability @default(available)
+  /// Set when unavailable, so the editor knows when to ask again.
+  unavailableUntil DateTime?
+  /// Editor-only note, e.g. "thorough on quantitative methods".
+  note             String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([availability])
+}
+
+/* ================================================================== *
+ * REGISTRY
+ * ================================================================== */
+
+/// The fix for the "Gender Studies" drift. A submission's section was a plain
+/// string with no registry behind it, so two names for one subject area split
+/// its queue filter in half and split its statistics.
+///
+/// Seed with the ten declared areas from /about/aims-scope, mapping
+/// "Gender Studies" onto "Gender & Development" on the way in.
+/// One editable journal setting, as a key and a value.
+///
+/// **A key-value table rather than a one-row table with twenty columns.**
+/// `site.config.ts` holds around forty values and most of them — the brand
+/// name, the licence, the access model — are decisions, not settings: changing
+/// them changes the journal, not its configuration. Only a handful are things
+/// an administrator should be able to edit without a deploy, and they arrive
+/// one at a time as the journal acquires them (an ISSN this year, a Crossref
+/// prefix next). A column per value would mean a migration each time.
+///
+/// **The config file stays the default.** A row here overrides it; no row means
+/// the file's value stands. So a fresh database renders exactly as before, and
+/// deleting a row is how a setting is reverted rather than a special empty
+/// state.
+model JournalSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  /// Who last changed it. Null for a row written by a migration or seed.
+  updatedBy String?  @db.Uuid
+}
+
+model Section {
+  id        String  @id @default(uuid()) @db.Uuid
+  name      String  @unique
+  slug      String  @unique
+  /// An inactive section stops being offered to authors but keeps its history.
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  submissions Submission[]
+
+  @@index([active])
+}
+
+/// Criteria are not just questions — they are the axis every returned report
+/// is scored on. Adding or removing one mid-life leaves old and new reports
+/// incomparable, while an editor at a decision reads them side by side
+/// believing otherwise.
+///
+/// A report in progress finishes on the form it started on; old versions stay
+/// readable forever.
+model ReviewForm {
+  id        String   @id @default(uuid()) @db.Uuid
+  version   Int      @unique
+  /// The ReviewCriterion list this version scored on.
+  criteria  Json
+  /// Exactly one active at a time — enforced in the action.
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  reports ReviewerReport[]
+}
+
+/* ================================================================== *
+ * WORKFLOW — the centre of the schema
+ * ================================================================== */
+
+/// A manuscript while it is still in the workflow. An `Article` is what this
+/// becomes once published; the two are separate because almost every field
+/// differs — a submission has a status, decision history and reviewer
+/// assignments, and has no volume, issue, DOI or galleys until accepted.
+model Submission {
+  id            String           @id @default(uuid()) @db.Uuid
+  /// "BORJSS-2026-0042". Quoted in all correspondence, so it comes from a
+  /// Postgres sequence and never from a row count — a count repeats an id
+  /// after a deletion.
+  reference     String           @unique
+  title         String
+  abstract      String
+  keywords      String[]
+  type          ArticleType
+  sectionId     String           @db.Uuid
+  submittedById String           @db.Uuid
+  status        SubmissionStatus @default(draft)
+  /// 1 until a revision is asked for.
+  round         Int              @default(1)
+  submittedAt   DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  /// Set when the author is asked for changes, so the page can show a countdown.
+  revisionDueAt DateTime?
+  /// Set once published, linking through to the public article.
+  articleId     String?          @unique @db.Uuid
+
+  /* --- what the wizard collects, kept on the submission itself --- *
+   * All nullable, because a draft acquires them step by step and a manuscript
+   * seeded before the wizard existed has none. `submitSubmission` is where the
+   * required ones are enforced — a draft with a blank abstract is a draft, but
+   * a submitted manuscript without one is not submittable.                    */
+
+  /// Grant numbers and funders, as the author wrote them.
+  funding            String?
+  /// Never blank on a submitted manuscript: "None" is itself a declaration,
+  /// and an empty field cannot be told apart from an unanswered one.
+  conflictOfInterest String?
+  /// How generative AI was used, if it was. Worded on the form as disclosure,
+  /// not permission — the AI policy allows assistance and requires disclosure.
+  aiDisclosure       String?
+  /// Which of the seven data-availability statements applies, and its detail.
+  dataAvailability   String?
+  /// The five wizard declarations, confirmed together at step 5. Stored as a
+  /// timestamp rather than five booleans: they are only ever accepted as a set,
+  /// and what a later dispute needs to know is *when* they were made.
+  declaredAt         DateTime?
+  /// Typed at the upload step, not attached. Stored here rather than as a
+  /// `SubmissionFile` because there is no file, and rather than as a
+  /// `SubmissionMessage` because it belongs to the submission, not to a thread.
+  coverLetter        String?
+
+  section       Section              @relation(fields: [sectionId], references: [id])
+  submittedBy   User                 @relation("SubmittedBy", fields: [submittedById], references: [id])
+  article       Article?             @relation(fields: [articleId], references: [id])
+  contributors  Contributor[]
+  files         SubmissionFile[]
+  decisions     SubmissionDecision[]
+  messages      SubmissionMessage[]
+  assignments   ReviewAssignment[]
+  reports       ReviewerReport[]
+  productionJob ProductionJob?
+  issuePlacement IssuePlanItem?
+
+  /// Drafts are excluded from every editorial read and from statistics. An
+  /// author still filling in the wizard has not handed anything over, and
+  /// counting them inflates both the total and the acceptance rate's
+  /// denominator.
+  @@index([status])
+  @@index([sectionId])
+  @@index([submittedById])
+  @@index([submittedAt])
+}
+
+model Contributor {
+  id              String  @id @default(uuid()) @db.Uuid
+  submissionId    String  @db.Uuid
+  givenName       String
+  familyName      String
+  orcid           String?
+  email           String?
+  isCorresponding Boolean @default(false)
+  /// Author order is a claim about contribution, so it is explicit and the
+  /// database never sorts the list itself.
+  position        Int
+
+  submission   Submission                @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  affiliations ContributorAffiliation[]
+
+  @@index([submissionId])
+}
+
+/// Its own table rather than a repeated string, because two authors at the
+/// same institution must resolve to one row — that is what makes an
+/// affiliation-based conflict check possible at all.
+model Affiliation {
+  id      String  @id @default(uuid()) @db.Uuid
+  name    String  @unique
+  city    String?
+  country String?
+  /// ROR id — the research organisation registry identifier.
+  ror     String?
+
+  contributors        ContributorAffiliation[]
+  articleContributors ArticleContributorAffiliation[]
+}
+
+model ContributorAffiliation {
+  contributorId String @db.Uuid
+  affiliationId String @db.Uuid
+
+  contributor Contributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  affiliation Affiliation @relation(fields: [affiliationId], references: [id])
+
+  @@id([contributorId, affiliationId])
+}
+
+model SubmissionFile {
+  id           String             @id @default(uuid()) @db.Uuid
+  submissionId String             @db.Uuid
+  kind         SubmissionFileKind
+  filename     String
+  /// The Cloudinary `publicId`, and **only** that — never a URL.
+  ///
+  /// Verified against the live account: an id on its own opens nothing (401),
+  /// while the URL `upload()` returns carries a signature that never expires
+  /// and would be a permanent key to a confidential manuscript. Reads go
+  /// through `/files/<id>`, which checks entitlement and mints a ten-minute
+  /// signed URL per request.
+  storagePath  String
+  sizeBytes    BigInt
+  /// 0 is the original; each revision increments.
+  round        Int                @default(0)
+  uploadedAt   DateTime           @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+}
+
+/// History, never overwritten. On a resubmission the question an editor is
+/// really answering is whether the author did what round 1 asked, which cannot
+/// be judged without round 1 on screen.
+model SubmissionDecision {
+  id           String       @id @default(uuid()) @db.Uuid
+  submissionId String       @db.Uuid
+  type         DecisionType
+  round        Int
+  /// A key, not a display name: an id survives someone changing their name.
+  decidedById  String       @db.Uuid
+  /// The letter sent to the author, as paragraphs.
+  letter       String[]
+  /// The handling editor's private note. Never sent to the author or the
+  /// reviewers; kept for the editorial record.
+  internalNote String?
+  decidedAt    DateTime     @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  decidedBy  User       @relation(fields: [decidedById], references: [id])
+
+  @@index([submissionId])
+}
+
+model SubmissionMessage {
+  id           String   @id @default(uuid()) @db.Uuid
+  submissionId String   @db.Uuid
+  fromId       String   @db.Uuid
+  /// Drives alignment and labelling; the author sees their own on one side.
+  fromRole     String
+  subject      String
+  body         String[]
+  sentAt       DateTime @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  from       User       @relation(fields: [fromId], references: [id])
+
+  @@index([submissionId])
+}
+
+/// Records that a reviewer was asked and whether they answered. It carries
+/// **no report body** — see `ReviewerReport` for why that separation matters.
+model ReviewAssignment {
+  id             String           @id @default(uuid()) @db.Uuid
+  submissionId   String           @db.Uuid
+  reviewerId     String           @db.Uuid
+  /// "Reviewer 2" — what the author is shown instead of a name. Stored rather
+  /// than computed, so the label in a decision letter still means the same
+  /// person a year later.
+  label          String
+  round          Int
+  status         AssignmentStatus @default(invited)
+  invitedAt      DateTime         @default(now())
+  respondedAt    DateTime?
+  dueAt          DateTime?
+  completedAt    DateTime?
+  /// A decline naming a better-placed colleague is worth far more to an editor
+  /// than a bare no. Never required — forcing an explanation only produces
+  /// empty ones.
+  declineReason  String?
+  /// The handling editor's note accompanying the invitation.
+  invitationNote String?
+
+  submission Submission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewer   User            @relation(fields: [reviewerId], references: [id])
+  report     ReviewerReport?
+
+  @@index([submissionId])
+  @@index([reviewerId])
+  @@index([status])
+}
+
+/// Its own table, and that is the point.
+///
+/// `ReviewAssignment` is embedded in the submission an author-facing screen
+/// renders. A report body sitting there would be one careless `.map()` away
+/// from reaching the author before the decision letter does.
+///
+/// **Only editorial reads may load this table.** `getReportsForSubmission()`
+/// is the one function that does, and no author-facing page calls it.
+model ReviewerReport {
+  id               String               @id @default(uuid()) @db.Uuid
+  assignmentId     String               @unique @db.Uuid
+  submissionId     String               @db.Uuid
+  /// Which form version scored this. Without it, a criterion change makes old
+  /// and new reports silently incomparable.
+  reviewFormId     String               @db.Uuid
+  round            Int
+  /// Record<ReviewCriterion, 1..5 | null> — the same shape the review form
+  /// produces, so what the editor reads is literally what the reviewer wrote.
+  scores           Json
+  recommendation   ReviewRecommendation
+  /// Shown to the author with the decision letter. The form enforces a
+  /// 200-character floor; no other path should accept less.
+  commentsToAuthor String[]
+  /// Editor only. A confidential note pasted into a decision letter by mistake
+  /// is the failure this separation exists to prevent.
+  commentsToEditor String[]
+  /// Reviewer flagged a possible ethics or integrity concern.
+  concernsRaised   String?
+  submittedAt      DateTime             @default(now())
+
+  assignment ReviewAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  submission Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewForm ReviewForm       @relation(fields: [reviewFormId], references: [id])
+
+  @@index([submissionId])
+}
+
+/* ================================================================== *
+ * PRODUCTION
+ *
+ * `SubmissionStatus` keeps one member for all of this — `inProduction` —
+ * which is the right answer for the author and the editor, who both want one
+ * answer to "where is it?". The person doing the work reads the stages below.
+ * Splitting that enum would have changed every author-facing screen to serve
+ * three, and leaked production's internal stages to authors.
+ * ================================================================== */
+
+model ProductionJob {
+  id           String   @id @default(uuid()) @db.Uuid
+  submissionId String   @unique @db.Uuid
+  issueId      String?  @db.Uuid
+  enteredAt    DateTime @default(now())
+
+  submission  Submission              @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  issue       EditorialIssue?         @relation(fields: [issueId], references: [id])
+  stages      ProductionStageRecord[]
+  galleys     ProductionGalley[]
+  corrections ProofCorrection[]
+
+  @@index([issueId])
+}
+
+model ProductionStageRecord {
+  id             String          @id @default(uuid()) @db.Uuid
+  jobId          String          @db.Uuid
+  stage          ProductionStage
+  state          StageState      @default(notStarted)
+  assignedToId   String?         @db.Uuid
+  startedAt      DateTime?
+  /// What makes `withAuthor` measurable: the queue ages a job from whatever
+  /// actually started the wait.
+  sentToAuthorAt DateTime?
+  completedAt    DateTime?
+  dueAt          DateTime?
+  notes          String[]
+
+  job        ProductionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  assignedTo User?         @relation(fields: [assignedToId], references: [id])
+
+  @@unique([jobId, stage])
+  @@index([state])
+}
+
+/// Versioned, never replaced. A correction produces a new version, and "which
+/// one did the author approve?" is unanswerable from a single overwritten file.
+///
+/// Deliberately **not** the published `ArticleGalley`: that one is what a
+/// reader is offered (label, URL, MIME type); this is the same file while it
+/// is still being made, where version and `isFinal` are what matter. The
+/// published row is created from the final production galley.
+model ProductionGalley {
+  id          String       @id @default(uuid()) @db.Uuid
+  jobId       String       @db.Uuid
+  format      GalleyFormat
+  version     Int
+  isFinal     Boolean      @default(false)
+  storagePath String
+  sizeBytes   BigInt?
+  createdAt   DateTime     @default(now())
+
+  job ProductionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, format, version])
+  @@index([jobId])
+}
+
+/// Tracked one by one. The question at the end of proofreading is never "is it
+/// done" but "which of these were actually applied" — an author who reported
+/// five and sees three fixed writes to the editorial office, and the answer
+/// has to exist somewhere.
+model ProofCorrection {
+  id             String   @id @default(uuid()) @db.Uuid
+  jobId          String   @db.Uuid
+  /// Where in the galley, as the proofreader described it: "p. 4, ¶2".
+  ///
+  /// Its own column since 20260914120000. It used to be packed into the front
+  /// of `description` and split back out on read, which was tolerable while
+  /// the screen was read-only and is not once corrections are written from a
+  /// form — any description containing ": " round-tripped wrong.
+  location       String
+  description    String
+  /// Who raised it. Also added in 20260914120000: it was not stored at all,
+  /// and the read mapper hard-coded "author" — wrong for every correction the
+  /// proofreader or copyeditor raised.
+  raisedBy       CorrectionRaisedBy
+  applied        Boolean  @default(false)
+  /// A declined correction keeps its row *and* its reason. A missing reason is
+  /// itself the thing to fix, so the screen says so rather than rendering
+  /// an empty block.
+  declinedReason String?
+  reportedAt     DateTime @default(now())
+
+  job ProductionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+}
+
+enum CorrectionRaisedBy {
+  author
+  proofreader
+  copyeditor
+}
+
+/* ================================================================== *
+ * PUBLISHED RECORD
+ * ================================================================== */
+
+model Article {
+  id                 String   @id @default(uuid()) @db.Uuid
+  slug               String   @unique
+  doi                String?  @unique
+  type               ArticleType
+  title              String
+  subtitle           String?
+  abstract           String
+  keywords           String[]
+
+  issueId            String?  @db.Uuid
+  volume             Int
+  issueNumber        Int
+  pages              String?
+
+  receivedAt         DateTime?
+  revisedAt          DateTime?
+  acceptedAt         DateTime?
+  publishedAt        DateTime
+
+  license            String   @default("CC BY 4.0")
+  funding            String?
+  conflictOfInterest String?
+  ethicsStatement    String?
+  dataAvailability   String?
+
+  /// Not collected today. /admin/statistics says so rather than omitting the
+  /// row, because a statistics page that leaves out downloads invites the
+  /// reader to assume the number is zero.
+  views              Int      @default(0)
+  downloads          Int      @default(0)
+  citations          Int?
+
+  issue        Issue?               @relation(fields: [issueId], references: [id])
+  contributors ArticleContributor[]
+  galleys      ArticleGalley[]
+  references   Reference[]
+  doiRecord    DoiRecord?
+  submission   Submission?
+
+  @@index([issueId])
+  @@index([publishedAt])
+}
+
+/// A published article's byline, separate from `Contributor` on purpose.
+///
+/// `Contributor` belongs to a `Submission` and stays editable: a spelling, an
+/// affiliation, a withdrawn co-author. A published byline must not move when
+/// any of that is corrected -- it is already in other people's bibliographies,
+/// and a citation that silently changes is worse than one that is wrong in a
+/// visible way. So the published record carries its own rows, written once.
+///
+/// The practical reason it could not be borrowed: only one of the seven seeded
+/// articles has a `Submission` behind it at all, so reading the byline through
+/// `Submission.articleId` would leave six articles with no authors.
+model ArticleContributor {
+  id              String  @id @default(uuid()) @db.Uuid
+  articleId       String  @db.Uuid
+  givenName       String
+  familyName      String
+  orcid           String?
+  email           String?
+  isCorresponding Boolean @default(false)
+  /// Author order is a claim about contribution, so it is explicit and the
+  /// database never sorts the list itself.
+  position        Int
+
+  article      Article                         @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  affiliations ArticleContributorAffiliation[]
+
+  @@index([articleId])
+}
+
+/// Joins a published byline to the shared `Affiliation` registry, so an
+/// institution is still one row whether it is reached from a submission or
+/// from a published article. That is what keeps affiliation-based conflict
+/// checking possible.
+model ArticleContributorAffiliation {
+  articleContributorId String @db.Uuid
+  affiliationId        String @db.Uuid
+
+  articleContributor ArticleContributor @relation(fields: [articleContributorId], references: [id], onDelete: Cascade)
+  affiliation        Affiliation        @relation(fields: [affiliationId], references: [id])
+
+  @@id([articleContributorId, affiliationId])
+}
+
+model ArticleGalley {
+  id        String  @id @default(uuid()) @db.Uuid
+  articleId String  @db.Uuid
+  label     String
+  url       String
+  mimeType  String
+  sizeBytes BigInt?
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+}
+
+model Reference {
+  id        String  @id @default(uuid()) @db.Uuid
+  articleId String  @db.Uuid
+  raw       String
+  doi       String?
+  position  Int
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+}
+
+/// The published record the public archive reads. `EditorialIssue` below is
+/// one being assembled — a state, a target date that moves, and a running
+/// order. Making half of this model optional would have blurred the two.
+model Issue {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique
+  volume      Int
+  number      Int
+  year        Int
+  title       String?
+  coverUrl    String?
+  publishedAt DateTime
+
+  articles Article[]
+
+  @@unique([volume, number])
+}
+
+model EditorialIssue {
+  id              String     @id @default(uuid()) @db.Uuid
+  volume          Int
+  number          Int
+  year            Int
+  title           String?
+  state           IssueState @default(planned)
+  /// Intended publication date. Moves while `planned`.
+  targetDate      DateTime
+  /// Set only once published; the public `Issue` is created from it.
+  publishedAt     DateTime?
+  /// An editorial planning target, not a cap.
+  plannedArticles Int?
+  /// Slug of the published issue, once there is one.
+  slug            String?
+
+  items          IssuePlanItem[]
+  productionJobs ProductionJob[]
+
+  @@unique([volume, number])
+  @@index([state])
+}
+
+/// A placement pointing at a manuscript that cannot be found renders as a gap
+/// in the table of contents rather than being dropped — a silently shortened
+/// TOC is the harder bug.
+model IssuePlanItem {
+  id               String @id @default(uuid()) @db.Uuid
+  editorialIssueId String @db.Uuid
+  submissionId     String @unique @db.Uuid
+  position         Int
+
+  editorialIssue EditorialIssue @relation(fields: [editorialIssueId], references: [id], onDelete: Cascade)
+  submission     Submission     @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([editorialIssueId])
+}
+
+/// A log, not a flag. A deposit is an event with an outcome: a failed deposit
+/// is retried, and both attempts matter when someone asks why a DOI does not
+/// resolve.
+///
+/// Every row starts `notDeposited` — the journal has no Crossref prefix, so
+/// there could not have been a deposit. `hasCrossrefPrefix()` derives the
+/// banner from the data, so it disappears by itself when real DOIs land.
+model DoiRecord {
+  id            String       @id @default(uuid()) @db.Uuid
+  articleId     String       @unique @db.Uuid
+  doi           String       @unique
+  state         DepositState @default(notDeposited)
+  attempts      Int          @default(0)
+  lastAttemptAt DateTime?
+  registeredAt  DateTime?
+  /// Crossref's message when failed, shown verbatim.
+  failureReason String?
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([state])
+}
+
+/* ================================================================== *
+ * SITE
+ * ================================================================== */
+
+/// Announcements, news and events share one shape and one lifecycle, so the
+/// listing and detail pages are written once.
+model Post {
+  id          String                @id @default(uuid()) @db.Uuid
+  kind        PostKind
+  slug        String
+  title       String
+  summary     String
+  body        String[]
+  publishedAt DateTime
+  category    AnnouncementCategory?
+  /// A call for papers past its deadline vanishes from the public list, and
+  /// whoever wrote it needs to see that it has.
+  expiresAt   DateTime?
+
+  // Events only.
+  eventStartsAt   DateTime?
+  eventEndsAt     DateTime?
+  eventLocation   String?
+  eventOnline     Boolean?
+  eventRegisterUrl String?
+  eventDeadline   DateTime?
+
+  actionLabel String?
+  actionHref  String?
+
+  @@unique([kind, slug])
+  @@index([publishedAt])
+}
+
+model BoardMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  name        String
+  role        String
+  institution String
+  country     String
+  orcid       String?
+  scholarUrl  String?
+  photoUrl    String?
+  category    BoardCategory
+  sortOrder   Int           @default(0)
+
+  @@index([category])
+}
+
+/// Append-only. No update, no delete — enforced by permission, not by
+/// convention.
+///
+/// Four properties the /admin/audit-log page names and this model has to keep:
+/// the actor is stored as an id *and* a name, so a renamed account does not
+/// rewrite history; reads are recorded as well as writes, because who opened a
+/// manuscript matters in a misconduct investigation; a retention period is
+/// stated; and an administrator must not be able to inspect the log of their
+/// own actions — which is why `audit.view` is withheld from `admin`.
+model AuditEntry {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  /// Kept alongside the id so history survives a rename — and survives the
+  /// actor being an account that no longer exists.
+  actorName  String
+  action     String
+  targetType String
+  targetId   String?
+  detail     Json?
+  occurredAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([occurredAt])
+  @@index([targetType, targetId])
+}
+
+/* ================================================================== *
+ * PUBLIC FORMS
+ *
+ * The two forms a signed-out visitor can submit. Both already validate with
+ * Zod and carry a honeypot; Phase 4 gives them a place to land. Neither sends
+ * email yet — `/contact` and `/for-reviewers/become-a-reviewer` still say so
+ * on screen — so `handledAt` stays null until someone in the editorial office
+ * works the queue by hand.
+ * ================================================================== */
+
+enum ContactTopic {
+  submission
+  review
+  editorial
+  technical
+  charges
+  permissions
+  other
+}
+
+/// A message from the public contact form. Kept even after it is handled — an
+/// enquiry about a manuscript is part of that manuscript's paper trail.
+model ContactMessage {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  email        String
+  affiliation  String?
+  topic        ContactTopic
+  /// Free text the sender typed; only meaningful for topic = submission.
+  manuscriptId String?
+  message      String
+  /// Set when the editorial office has actioned it. Null = still in the queue.
+  handledAt    DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@index([handledAt])
+  @@index([createdAt])
+}
+
+enum ReviewerApplicationDegree {
+  phd
+  doctoralCandidate @map("doctoral-candidate")
+  masters
+  other
+}
+
+enum ReviewerApplicationStatus {
+  pending
+  accepted
+  declined
+}
+
+/// A reviewer application from the public form. Distinct from `ReviewerProfile`
+/// (a pool entry an editor picks from) and from `User` (a login): this is the
+/// raw application, reviewed by hand, and only becomes a profile if accepted.
+model ReviewerApplication {
+  id          String                    @id @default(uuid()) @db.Uuid
+  name        String
+  email       String
+  institution String
+  position    String
+  country     String
+  degree      ReviewerApplicationDegree
+  orcid       String?
+  scholarUrl  String?
+  /// Subject areas and methods, stored as the checkbox values the form posts.
+  subjects    String[]
+  methods     String[]
+  /// Free-text list of specific topics the applicant can review.
+  keywords    String
+  experience  String?
+  /// Reviews per year the applicant offers: "1-2" | "3-4" | "5-6" | "more".
+  capacity    String
+  status      ReviewerApplicationStatus @default(pending)
+  createdAt   DateTime                  @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}

@@ -64,6 +64,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 412_000,
         uploadedAt: "2026-08-20",
         round: 0,
+        stored: false,
       },
       {
         id: "qf2",
@@ -72,6 +73,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 28_000,
         uploadedAt: "2026-08-20",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [],
@@ -136,6 +138,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 388_000,
         uploadedAt: "2026-06-30",
         round: 0,
+        stored: false,
       },
       {
         id: "qf4",
@@ -144,6 +147,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 26_000,
         uploadedAt: "2026-06-30",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [],
@@ -229,6 +233,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 496_000,
         uploadedAt: "2026-05-18",
         round: 0,
+        stored: false,
       },
       {
         id: "qf6",
@@ -237,6 +242,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 31_000,
         uploadedAt: "2026-05-18",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [],
@@ -309,6 +315,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 421_000,
         uploadedAt: "2026-02-11",
         round: 0,
+        stored: false,
       },
       {
         id: "qf8",
@@ -317,6 +324,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 447_000,
         uploadedAt: "2026-08-25",
         round: 1,
+        stored: false,
       },
       {
         id: "qf9",
@@ -325,6 +333,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 64_000,
         uploadedAt: "2026-08-25",
         round: 1,
+        stored: false,
       },
     ],
     decisions: [
@@ -420,6 +429,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 356_000,
         uploadedAt: "2026-09-03",
         round: 0,
+        stored: false,
       },
       {
         id: "qf11",
@@ -428,6 +438,7 @@ export const mockQueueSubmissions: Submission[] = [
         sizeBytes: 24_000,
         uploadedAt: "2026-09-03",
         round: 0,
+        stored: false,
       },
     ],
     decisions: [],

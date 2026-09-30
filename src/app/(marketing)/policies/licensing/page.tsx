@@ -29,7 +29,6 @@ export default function Page() {
       title="Licensing Policy"
       lead="Every article is published under a Creative Commons Attribution 4.0 International licence. This page sets out exactly what that permits, and what it asks in return."
       toc={TOC}
-      updated="2026-01-15"
       related={["copyright", "open-access", "data-availability"]}
     >
       <h2 id="licence">The licence</h2>

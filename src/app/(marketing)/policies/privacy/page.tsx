@@ -33,7 +33,6 @@ export default function Page() {
       title="Privacy Policy"
       lead="This policy explains what personal data the journal collects, what it does with it, and what rights you have over it. It describes the site as it actually works today, not as it may work later."
       toc={TOC}
-      updated="2026-01-15"
       related={["complaints-appeals", "research-ethics", "data-availability"]}
     >
       <h2 id="who">Who is responsible</h2>
@@ -69,16 +68,19 @@ export default function Page() {
           no cookie of any kind.
         </li>
         <li>
-          <strong>The forms do not yet deliver.</strong> The contact and
-          reviewer-application forms currently validate what you type and
-          confirm receipt, but the message is not yet transmitted or stored —
-          the mail provider has not been connected. Use the email addresses on
-          the <Link href="/contact">contact page</Link> if you need a reply.
+          <strong>The forms save, but do not yet notify anyone.</strong> The
+          contact and reviewer-application forms record what you submit so the
+          editorial office can act on it, but no email is sent — to you or to
+          the office — because the mail provider has not been connected. If you
+          need a prompt reply, use the email addresses on the{" "}
+          <Link href="/contact">contact page</Link> as well.
         </li>
         <li>
-          <strong>The submission system is not live.</strong> Manuscript
-          submission and the author, reviewer and editor portal are in
-          development.
+          <strong>Manuscripts are still sent by email.</strong> The portal is
+          built and accounts, submissions and peer review all work inside it,
+          but it is not yet open to authors — email notification is not
+          connected, so nobody would be told what happened to their manuscript.
+          Until it opens, submissions reach the editorial office by email.
         </li>
       </ul>
       <p>
@@ -97,22 +99,22 @@ export default function Page() {
             ],
             [
               "Contact form",
-              "Your name, email address, subject and message — validated in your browser and on the server. Not currently stored or forwarded.",
+              "Your name, email address, subject and message. Stored for the editorial office to respond to; not forwarded anywhere else, and no email is sent yet.",
             ],
             [
               "Reviewer application",
-              "Your name, email, affiliation, position, areas of expertise and any ORCID iD you supply. Not currently stored or forwarded.",
+              "Your name, email, affiliation, position, areas of expertise and any ORCID iD you supply. Stored as a pending application for an editor to review; not forwarded anywhere else.",
             ],
             [
-              "Manuscript submission (planned)",
+              "Manuscript submission",
               "Author names, affiliations, email addresses, ORCID iDs, the manuscript and its files, and declarations.",
             ],
             [
-              "Peer review (planned)",
+              "Peer review",
               "Reviewer identity, expertise, review history, availability, and the content of reports.",
             ],
             [
-              "Accounts (planned)",
+              "Accounts",
               "Name, email, password (stored hashed, never in readable form), role and activity within the portal.",
             ],
             [
@@ -192,12 +194,12 @@ export default function Page() {
         nothing to consent to.
       </p>
       <p>
-        When the portal launches, signing in will set a{" "}
-        <strong>single strictly necessary cookie</strong> to keep you signed in.
-        It will hold a session reference only, will not track you across other
-        sites, and cannot be disabled without making sign-in impossible. No
-        consent banner is required for a cookie of that kind, and none will be
-        added for tracking, because tracking is not planned.
+        Signing in to the portal sets a{" "}
+        <strong>single strictly necessary cookie</strong> that keeps you signed
+        in. It holds a session token only, does not track you across other
+        sites, and cannot be disabled without making sign-in impossible. Signing
+        out clears it. No consent banner is required for a cookie of that kind,
+        and none will be added for tracking, because tracking is not planned.
       </p>
       <p>
         Should the journal ever add analytics, it will use a privacy-preserving

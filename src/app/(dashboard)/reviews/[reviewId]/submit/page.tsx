@@ -73,7 +73,7 @@ export default async function Page({
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem] lg:items-start">
         <div className="min-w-0">
-          <ReviewForm reference={task.reference} />
+          <ReviewForm reviewId={task.id} reference={task.reference} />
         </div>
 
         {/* Sticky, so the abstract stays beside the form however far down the

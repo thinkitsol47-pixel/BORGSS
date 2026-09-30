@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useFormState, useFormStatus } from "react-dom";
 import { AlertOctagon, Ban, RotateCcw } from "lucide-react";
-import { Button, Input } from "@/components/ui";
+import {
+  saveUserStatus,
+  type UserAdminState,
+} from "@/app/(dashboard)/admin/users/actions";
+import { Alert, Button, Field, Input } from "@/components/ui";
 import type { AccountStatus } from "@/types";
+
+const initialState: UserAdminState = { status: "idle" };
 
 /**
  * Suspend, restore, and the deletion that is deliberately refused.
@@ -15,23 +22,31 @@ import type { AccountStatus } from "@/types";
  * that a backend would then have to refuse is worse than explaining now why
  * suspension is the operation that exists.
  *
- * UI ONLY. Nothing happens; there is no database.
+ * Phase 4: these save. The two refusals — your own account, and an
+ * administrator's if you are not a super administrator — are rendered here as
+ * an explanation and repeated in `saveUserStatus`, which is the actual guard.
  */
 export function UserDangerZone({
+  userId,
   name,
   status,
   isSelf,
+  /** True when the target outranks what this administrator may change. */
+  isProtected,
 }: {
+  userId: string;
   name: string;
   status: AccountStatus;
   isSelf: boolean;
+  isProtected: boolean;
 }) {
+  const [state, formAction] = useFormState(saveUserStatus, initialState);
   const [confirming, setConfirming] = useState(false);
   const [typed, setTyped] = useState("");
 
   const suspended = status === "suspended";
-  // Typing the name is the friction that stops a misclick. It is also how the
-  // real action should work, so the interface does not change later.
+  // Typing the name is the friction that stops a misclick on a screen full of
+  // other people's accounts.
   const canConfirm = typed.trim() === name;
 
   return (
@@ -39,6 +54,23 @@ export function UserDangerZone({
       <h2 id="danger-heading" className="font-serif text-lg font-semibold">
         {suspended ? "Restore access" : "Suspend access"}
       </h2>
+
+      {state.status === "success" && (
+        <div className="mt-3">
+          <Alert tone="success" title="Saved">
+            {state.message}
+          </Alert>
+        </div>
+      )}
+      {state.status === "error" && (
+        <div className="mt-3">
+          <Alert tone="danger" title="Nothing was changed">
+            {state.message ??
+              state.errors?.suspendedReason ??
+              "Please check the form."}
+          </Alert>
+        </div>
+      )}
 
       <div className="mt-3 rounded-xl border border-warning/40 bg-warning/5 p-4">
         {isSelf ? (
@@ -52,25 +84,26 @@ export function UserDangerZone({
               themselves out has no way back in.
             </span>
           </p>
+        ) : isProtected ? (
+          <p className="flex items-start gap-2 text-sm leading-relaxed">
+            <AlertOctagon className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+            <span>
+              This is an administrator account. Only a super administrator can
+              suspend or restore one — suspension removes access as completely
+              as revoking the role, so it obeys the same rule.
+            </span>
+          </p>
         ) : suspended ? (
           <>
             <p className="text-sm leading-relaxed">
               This account cannot sign in. Restoring it returns access
               immediately; the reason it was suspended stays on the record.
             </p>
-            <div className="mt-4">
-              <Button
-                variant="outline"
-                onClick={() =>
-                  alert(
-                    "Nothing changed — there is no database yet.\n\nRestoring an account is not built.",
-                  )
-                }
-              >
-                <RotateCcw className="size-4" aria-hidden />
-                Restore access
-              </Button>
-            </div>
+            <form action={formAction} className="mt-4">
+              <input type="hidden" name="userId" value={userId} />
+              <input type="hidden" name="status" value="active" />
+              <RestoreButton />
+            </form>
           </>
         ) : !confirming ? (
           <>
@@ -87,8 +120,29 @@ export function UserDangerZone({
             </div>
           </>
         ) : (
-          <>
-            <p className="text-sm leading-relaxed">
+          <form action={formAction}>
+            <input type="hidden" name="userId" value={userId} />
+            <input type="hidden" name="status" value="suspended" />
+
+            {/* A suspension nobody can explain later is not defensible against
+                an appeal, so the reason is asked for here rather than left to
+                the edit screen. */}
+            <Field
+              label="Reason for suspension"
+              htmlFor="suspendedReason"
+              required
+              hint="Held against the account and shown on it."
+            >
+              <textarea
+                id="suspendedReason"
+                name="suspendedReason"
+                rows={3}
+                required
+                className="w-full rounded-lg border border-brand-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              />
+            </Field>
+
+            <p className="mt-4 text-sm leading-relaxed">
               Type <span className="font-medium">{name}</span> to confirm.
             </p>
             <div className="mt-3 max-w-sm">
@@ -100,18 +154,9 @@ export function UserDangerZone({
               />
             </div>
             <div className="mt-4 flex flex-wrap gap-3">
+              <SuspendButton disabled={!canConfirm} />
               <Button
-                variant="danger"
-                disabled={!canConfirm}
-                onClick={() =>
-                  alert(
-                    "Nothing changed — there is no database yet.\n\nSuspending an account is not built.",
-                  )
-                }
-              >
-                Suspend account
-              </Button>
-              <Button
+                type="button"
                 variant="outline"
                 onClick={() => {
                   setConfirming(false);
@@ -121,7 +166,7 @@ export function UserDangerZone({
                 Cancel
               </Button>
             </div>
-          </>
+          </form>
         )}
       </div>
 
@@ -142,5 +187,24 @@ export function UserDangerZone({
         </p>
       </div>
     </section>
+  );
+}
+
+function RestoreButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="outline" disabled={pending}>
+      <RotateCcw className="size-4" aria-hidden />
+      {pending ? "Restoring…" : "Restore access"}
+    </Button>
+  );
+}
+
+function SuspendButton({ disabled }: { disabled: boolean }) {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" variant="danger" disabled={disabled || pending}>
+      {pending ? "Suspending…" : "Suspend account"}
+    </Button>
   );
 }

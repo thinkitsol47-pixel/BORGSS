@@ -27,7 +27,6 @@ export default function Page() {
       title="Research Integrity Policy"
       lead="Research ethics concerns how participants are treated. Research integrity concerns whether the account given of the work is accurate and complete enough for someone else to rely on."
       toc={TOC}
-      updated="2026-01-15"
       related={["publication-ethics", "data-availability", "retraction-correction"]}
     >
       <h2 id="principles">Principles</h2>

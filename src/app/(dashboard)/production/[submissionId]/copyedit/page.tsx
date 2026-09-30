@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { requireGroup } from "@/lib/auth/require-role";
-import { getProductionContext, stageRecord } from "@/lib/api/production";
+import {
+  getProductionContext,
+  getProductionTeam,
+  stageRecord,
+} from "@/lib/api/production";
 import { ProductionHeader } from "@/components/portal/production-header";
 import { StagePanel } from "@/components/portal/stage-panel";
 import { StageActions } from "@/components/portal/production-actions";
@@ -13,7 +17,7 @@ export const metadata: Metadata = { title: "Copyediting" };
 /**
  * The first production stage.
  *
- * A copyediting screen in a system with no file storage cannot show tracked
+ * A copyediting screen with no tracked-changes pipeline cannot show tracked
  * changes, so it does not pretend to. What it can honestly show is the state
  * of the stage, the files there are to work from, and the copyeditor's own
  * notes — which is what someone picking this up mid-job actually needs.
@@ -30,6 +34,7 @@ export default async function Page({
 
   const { job, submission, issue } = ctx;
   const record = stageRecord(job, "copyedit");
+  const team = await getProductionTeam();
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10">
@@ -50,6 +55,8 @@ export default async function Page({
           stage="copyedit"
           state={record.state}
           reference={job.reference}
+          submissionId={submission.id}
+          team={team}
         />
 
         {/* The author holding the copyedits is the state worth naming, because
@@ -73,8 +80,9 @@ export default async function Page({
             Files to work from
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            The accepted manuscript and everything submitted with it. There is
-            no file storage yet, so none of these can be opened or downloaded.
+            The accepted manuscript and everything submitted with it.
+            Downloads are not wired into this screen yet — open them from the
+            manuscript&rsquo;s own page.
           </p>
 
           <ul className="mt-3 divide-y rounded-xl border">
@@ -121,13 +129,9 @@ export default async function Page({
           </ul>
         </section>
 
-        <Alert tone="warning" title="Copyediting is not built yet">
-          The controls above are built, but there is no file storage and no
-          database, so nothing is saved and nothing reaches the author.
-          Copyediting is done in the document and coordinated by email,
-          quoting{" "}
-          <span className="font-medium">{job.reference}</span>.
-        </Alert>
+        {/* The title used to open with "The stage saves", which is now simply
+            what the screen does. What a copyeditor still needs told is that the
+            file does not travel with it. */}
       </div>
     </div>
   );

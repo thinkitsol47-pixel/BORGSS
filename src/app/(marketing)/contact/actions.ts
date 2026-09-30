@@ -1,6 +1,13 @@
 "use server";
 
+import { db } from "@/lib/db";
 import { contactSchema } from "@/lib/validation/schemas";
+import { siteConfig } from "@/config/site.config";
+import { sendEmail } from "@/lib/email/send";
+import {
+  contactNotifyOfficeEmail,
+  contactReceiptEmail,
+} from "@/lib/email/templates";
 
 export type ContactState = {
   status: "idle" | "success" | "error";
@@ -14,9 +21,16 @@ export type ContactState = {
 /**
  * Handles the contact form.
  *
- * SCAFFOLD: validates and returns, but does not yet deliver the message.
- * Wire the marked section to the transactional mail provider (Resend/Postmark)
- * and persist a copy for the editorial office.
+ * The message is persisted to `ContactMessage`, which is what
+ * `/admin/messages` works, and `handledAt` stays null until someone actions the
+ * row. Since phase 6 it is also emailed — to the office, and back to the sender
+ * as a receipt.
+ *
+ * **The row is the record and the mail is a courtesy**, in that order: a send
+ * that fails does not fail the action, because a message sitting in the queue
+ * has reached the office whether or not an email announced it. Note that with
+ * no verified domain the receipt to the sender is refused by the provider, so
+ * the success text promises the office has it and does not mention an inbox.
  */
 export async function submitContact(
   _prev: ContactState,
@@ -48,12 +62,47 @@ export async function submitContact(
   }
 
   try {
-    // TODO(backend): send to siteConfig.contact.* via the mail provider and
-    // record the enquiry. Until then the submission is validated only.
-    await new Promise((r) => setTimeout(r, 400));
+    const { name, email, affiliation, topic, manuscriptId, message } =
+      parsed.data;
+
+    await db.contactMessage.create({
+      data: {
+        name,
+        email,
+        affiliation: affiliation || null,
+        topic,
+        // Only meaningful for a submission enquiry; stored as typed regardless.
+        manuscriptId: manuscriptId || null,
+        message,
+      },
+    });
+
+    // **The row is the record; the mail is a courtesy.** Both sends are
+    // deliberately after the write and neither is allowed to fail the action —
+    // a message that reached the queue has reached the office whether or not
+    // an email about it was delivered. `/admin/messages` is worked regardless.
+    const office = siteConfig.contact.editorialOffice;
+    const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+
+    await Promise.all([
+      sendEmail(
+        contactNotifyOfficeEmail({
+          to: office,
+          fromName: name,
+          fromEmail: email,
+          subject: topic,
+          body: message,
+          queueUrl: `${base}/admin/messages`,
+        }),
+      ),
+      sendEmail(contactReceiptEmail({ to: email, name, subject: topic })),
+    ]);
 
     return {
       status: "success",
+      // No delivery claim: with no verified domain, mail to the sender is
+      // refused by the provider, and telling them to watch their inbox would
+      // be telling them something untrue.
       message:
         "Thank you — your message has reached the editorial office. We reply to most enquiries within two working days.",
     };

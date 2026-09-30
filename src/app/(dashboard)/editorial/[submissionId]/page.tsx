@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText, Mail, UserCheck } from "lucide-react";
+import { Mail, UserCheck } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
 import {
   getEditorialSubmissionById,
@@ -9,6 +9,7 @@ import {
   waitingOn,
 } from "@/lib/api/editorial";
 import { EditorialHeader } from "@/components/portal/editorial-header";
+import { FileLink } from "@/components/portal/file-link";
 import { Alert, Button } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import type { Contributor, Submission, SubmissionFile } from "@/types";
@@ -92,26 +93,23 @@ export default async function Page({
             </h2>
             <ul className="mt-3 divide-y rounded-xl border">
               {submission.files.map((f) => (
-                <li key={f.id} className="flex items-start gap-3 p-4">
-                  <FileText
-                    className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                    aria-hidden
-                  />
-                  <div className="min-w-0">
-                    <p className="break-all text-sm font-medium">{f.filename}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {fileKindLabel(f)} · {formatSize(f.sizeBytes)} ·{" "}
-                      {formatDate(f.uploadedAt)}
-                      {f.round > 0 && ` · revision ${f.round}`}
-                    </p>
-                  </div>
-                </li>
+                <FileLink
+                  key={f.id}
+                  id={f.id}
+                  filename={f.filename}
+                  stored={f.stored}
+                  detail={`${fileKindLabel(f)} · ${formatSize(f.sizeBytes)} · ${formatDate(f.uploadedAt)}${
+                    f.round > 0 ? ` · revision ${f.round}` : ""
+                  }`}
+                />
               ))}
             </ul>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Downloading is not available yet — there is no file store. The
-              editorial office holds these files by email in the meantime.
-            </p>
+            {submission.files.some((f) => !f.stored) && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Files without a download link were recorded before the journal
+                had file storage; the editorial office holds those by email.
+              </p>
+            )}
           </section>
         </div>
 
@@ -165,9 +163,14 @@ export default async function Page({
               <Mail className="size-4" aria-hidden />
               Contacting the author
             </h2>
+            {/* "Messaging is not built yet" was only half the reason. The
+                portal has no reply box, but even with one nothing could be
+                sent: the journal owns no domain, so no mail can leave the
+                platform at all. Stating only the smaller reason made the
+                bigger one look solved. */}
             <p className="mt-2 text-sm leading-relaxed text-brand-darker">
-              Messaging is not built yet. Write to the corresponding author
-              directly and quote{" "}
+              The portal cannot send mail yet — the journal owns no domain — so
+              write to the corresponding author from your own mailbox, quoting{" "}
               <span className="font-medium">{submission.reference}</span>.
             </p>
             {correspondingEmail(submission) && (

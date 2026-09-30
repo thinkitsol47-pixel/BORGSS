@@ -29,7 +29,6 @@ export default function Page() {
       title="Research Ethics Policy"
       lead="Social science research is conducted on people, with their data and about their lives. This policy sets out what the journal requires before it will publish such work."
       toc={TOC}
-      updated="2026-01-15"
       related={["publication-ethics", "research-integrity", "data-availability"]}
     >
       <h2 id="scope">What this policy covers</h2>

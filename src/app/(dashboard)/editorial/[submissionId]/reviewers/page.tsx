@@ -148,13 +148,18 @@ export default async function Page({
           </p>
         </section>
 
-        <Alert tone="warning" title="Inviting is not built yet">
-          The controls are built, but there is no database and no mail
-          provider, so no invitation actually goes anywhere. The editorial
-          office invites reviewers by email in the meantime, quoting{" "}
-          <span className="font-medium">{submission.reference}</span>. Conflict
-          checking is also incomplete — only a shared affiliation is detected,
-          so check co-authorship and supervision yourself before inviting.
+        {/* Kept: two things an editor must know *before* inviting, and neither
+            is visible from the buttons. */}
+        <Alert tone="warning" title="Before you invite">
+          <p>
+            No email is sent — the invitation appears in the reviewer&rsquo;s own
+            queue, so write to them yourself quoting{" "}
+            <span className="font-medium">{submission.reference}</span>.
+          </p>
+          <p className="mt-2">
+            Only a shared affiliation is checked for conflicts. Check
+            co-authorship and supervision yourself.
+          </p>
         </Alert>
       </div>
     </div>
@@ -188,6 +193,10 @@ const ASSIGNMENT_TONE: Record<
   overdue: {
     label: "Overdue",
     className: "border-warning/40 bg-warning/10 text-warning",
+  },
+  withdrawn: {
+    label: "Withdrawn",
+    className: "border-border bg-muted text-muted-foreground",
   },
 };
 
@@ -251,7 +260,11 @@ function AssignmentRow({
           {tone.label}
         </span>
         {!showRound && (
-          <AssignmentActions reviewerName={a.reviewerName} status={a.status} />
+          <AssignmentActions
+            assignmentId={a.id}
+            reviewerName={a.reviewerName}
+            status={a.status}
+          />
         )}
       </div>
     </div>
@@ -341,6 +354,8 @@ function MatchCard({
 
       <div className="mt-3 flex flex-wrap items-center justify-end">
         <InviteReviewerButton
+          submissionId={submission.id}
+          reviewerId={r.userId}
           reviewerName={r.name}
           reference={submission.reference}
           disabled={blocked}

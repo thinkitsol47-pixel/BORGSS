@@ -29,7 +29,6 @@ export default function Page() {
       title="Plagiarism Policy"
       lead="Every submission is screened for similarity to published work. This policy explains what the journal is looking for, why a similarity percentage is not by itself a finding, and what follows when plagiarism is confirmed."
       toc={TOC}
-      updated="2026-01-15"
       related={["publication-ethics", "research-integrity", "retraction-correction"]}
     >
       <h2 id="definition">What plagiarism is</h2>

@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Building2, Globe2, Mail } from "lucide-react";
+import { Building2, Globe2, Mail, Users } from "lucide-react";
 import type { BoardMember } from "@/types";
 import { getBoardMembers } from "@/lib/api/articles";
 import { siteConfig } from "@/config/site.config";
-import { Badge, Breadcrumb, Button, Eyebrow } from "@/components/ui";
+import {
+  Badge,
+  Breadcrumb,
+  Button,
+  EmptyState,
+  Eyebrow,
+} from "@/components/ui";
 
 export const revalidate = 3600;
 
@@ -82,6 +88,10 @@ export default async function EditorialBoardPage() {
           personal academic capacity and act independently of the publisher.
         </p>
 
+        {/* Counted, not asserted — and hidden entirely while the board is
+            being appointed, because "0 members / 0 institutions" reads as a
+            broken page rather than as a journal that has not announced one. */}
+        {board.length > 0 && (
         <dl className="mt-6 grid max-w-lg grid-cols-1 gap-px sm:grid-cols-3 overflow-hidden rounded-lg border border-brand-border bg-border">
           {[
             ["Members", board.length],
@@ -98,8 +108,18 @@ export default async function EditorialBoardPage() {
             </div>
           ))}
         </dl>
+        )}
       </header>
 
+      {groups.length === 0 ? (
+        <div className="mt-10">
+          <EmptyState
+            icon={Users}
+            title="The editorial board is being appointed"
+            description="Appointments are being confirmed and will be listed here, each with the member's institution and ORCID iD. Expressions of interest are welcome in the meantime."
+          />
+        </div>
+      ) : (
       <div className="mt-10 space-y-12">
         {groups.map((group) => (
           <section key={group.category} aria-labelledby={group.category}>
@@ -130,6 +150,7 @@ export default async function EditorialBoardPage() {
           </section>
         ))}
       </div>
+      )}
 
       {/* join the board */}
       <section className="mt-12 rounded-lg border border-brand-border bg-brand-tint/30 p-6 sm:p-8">

@@ -29,7 +29,6 @@ export default function Page() {
       title="Editorial Independence Policy"
       lead="What the journal publishes is decided on scholarly merit by its editors. This policy sets out the separation between that judgement and every other interest the journal has."
       toc={TOC}
-      updated="2026-01-15"
       related={["conflict-of-interest", "publication-ethics", "open-access"]}
     >
       <h2 id="statement">Statement of independence</h2>

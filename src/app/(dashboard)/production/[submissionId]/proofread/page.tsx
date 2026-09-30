@@ -6,6 +6,7 @@ import { requireGroup } from "@/lib/auth/require-role";
 import {
   currentStage,
   getProductionContext,
+  getProductionTeam,
   stageRecord,
 } from "@/lib/api/production";
 import { ProductionHeader } from "@/components/portal/production-header";
@@ -66,6 +67,7 @@ export default async function Page({
   const { job, submission, issue } = ctx;
   const record = stageRecord(job, "proofread");
   const galleysStage = stageRecord(job, "galleys");
+  const team = await getProductionTeam();
 
   const open = job.corrections.filter((c) => c.state === "open");
   const applied = job.corrections.filter((c) => c.state === "applied");
@@ -109,6 +111,8 @@ export default async function Page({
           stage="proofread"
           state={record.state}
           reference={job.reference}
+          submissionId={submission.id}
+          team={team}
         />
 
         {/* The finish line is stated only when it is true — and even then it
@@ -160,7 +164,7 @@ export default async function Page({
           </p>
 
           <div className="mt-4">
-            <AddCorrectionButton />
+            <AddCorrectionButton submissionId={submission.id} />
           </div>
 
           {job.corrections.length === 0 ? (
@@ -175,7 +179,7 @@ export default async function Page({
             <ul className="mt-4 space-y-3">
               {ordered.map((c) => (
                 <li key={c.id}>
-                  <CorrectionRow correction={c} />
+                  <CorrectionRow correction={c} submissionId={submission.id} />
                 </li>
               ))}
             </ul>
@@ -205,12 +209,9 @@ export default async function Page({
           </ul>
         </section>
 
-        <Alert tone="warning" title="Proofreading is not built yet">
-          The controls are built, but nothing they do is saved — there is no
-          database and no file storage. Proofs are circulated by email in the
-          meantime, quoting{" "}
-          <span className="font-medium">{job.reference}</span>.
-        </Alert>
+        {/* "Everything saves" was the half of this a proofreader can see for
+            themselves. The half they cannot is that the author hears nothing
+            from here. */}
       </div>
     </div>
   );
@@ -220,7 +221,13 @@ export default async function Page({
  * Pieces
  * ------------------------------------------------------------------ */
 
-function CorrectionRow({ correction: c }: { correction: ProofCorrection }) {
+function CorrectionRow({
+  correction: c,
+  submissionId,
+}: {
+  correction: ProofCorrection;
+  submissionId: string;
+}) {
   const tone = STATE_TONE[c.state];
 
   return (
@@ -250,7 +257,9 @@ function CorrectionRow({ correction: c }: { correction: ProofCorrection }) {
         Raised by {RAISED_BY_LABEL[c.raisedBy]} on {formatDate(c.raisedAt)}
       </p>
 
-      {c.state === "open" && <CorrectionActions location={c.id} />}
+      {c.state === "open" && (
+        <CorrectionActions correctionId={c.id} submissionId={submissionId} />
+      )}
 
       {/* A refusal always carries its reason. Where one is missing, the gap is
           named rather than rendering an empty block — the missing reason is

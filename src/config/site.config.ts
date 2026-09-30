@@ -28,12 +28,29 @@ export const siteConfig = {
   // and stop `hasCrossrefPrefix()` reporting that the journal has none.
   doiPrefix: process.env.CROSSREF_DOI_PREFIX?.trim() || "10.xxxxx",
 
+  /**
+   * Contact addresses, shown across the public site and the portal.
+   *
+   * **These are the journal's real, working addresses — deliberately so.**
+   * They used to read `editorial@blueoceanresearchjournal.org` and three
+   * siblings on the same domain, written in anticipation of buying it. The
+   * domain was never bought, so every one of those addresses bounced: the
+   * Messages tab, the contact page, all seventeen policies and the author
+   * guidelines each invited people to write to a mailbox that does not exist.
+   * An address that bounces is worse than no address, because the sender
+   * believes they have been in touch.
+   *
+   * **When the domain is bought**, point these back at it — one edit here
+   * changes every screen — and set `EMAIL_FROM` to an address on it. Until
+   * then a single real mailbox is the honest answer, even though four roles
+   * share it.
+   */
   contact: {
-    editorialOffice: "editorial@blueoceanresearchjournal.org",
-    submissions: "submissions@blueoceanresearchjournal.org",
-    support: "support@blueoceanresearchjournal.org",
-    charges: "apc@blueoceanresearchjournal.org",
-    address: "Editorial Office, BORJSS, [city], Pakistan",
+    editorialOffice: "ceoborjss@gmail.com",
+    submissions: "ceoborjss@gmail.com",
+    support: "ceoborjss@gmail.com",
+    charges: "ceoborjss@gmail.com",
+    address: "Editorial Office, BORJSS, Pakistan",
     phone: "",
   },
 

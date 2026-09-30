@@ -29,7 +29,6 @@ export default function Page() {
       title="Data Availability Policy"
       lead="Every article carries a statement saying where its data are and how to get them. The journal encourages open data but does not require it — what it requires is that readers be told the truth about what is available."
       toc={TOC}
-      updated="2026-01-15"
       related={["research-integrity", "research-ethics", "licensing"]}
     >
       <h2 id="requirement">The requirement</h2>

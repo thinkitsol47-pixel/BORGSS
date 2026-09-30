@@ -205,17 +205,21 @@ export default async function Page({
           ) : (
             <>
               <DecisionForm
+                submissionId={submission.id}
                 reference={submission.reference}
                 available={availableDecisions(submission)}
                 hasMissingReports={ctx.missing.length > 0}
               />
 
               <div className="mt-8">
-                <Alert tone="warning" title="Deciding is not built yet">
-                  There is no database and no mail provider, so nothing on this
-                  form is written to the manuscript&rsquo;s history and no
-                  letter reaches the author. Decisions go out from the editorial
-                  office by email in the meantime, quoting{" "}
+                {/* Kept: this sits directly above the submit, and an editor
+                    who records a decision believing the author has been told
+                    is the mistake it prevents. "There is no mail provider yet"
+                    was wrong — there is one; it cannot reach the author. */}
+                <Alert tone="info" title="The letter is still sent by hand">
+                  Recording a decision does <strong>not</strong> email the author
+                  or the reviewers — the journal owns no domain, so nothing can
+                  reach them. Send the letter from the editorial office, quoting{" "}
                   <span className="font-medium">{submission.reference}</span>.
                 </Alert>
               </div>

@@ -71,13 +71,19 @@ export default async function Page({
           <Badge variant={STATE_VARIANT[issue.state]} size="sm">
             {STATE_LABEL[issue.state]}
           </Badge>
-          <Link
-            href={`/editorial/issues/${issue.id}/edit`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-brand-border px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:border-brand hover:bg-brand-tint/50"
-          >
-            <Pencil className="size-3" aria-hidden />
-            Edit issue
-          </Link>
+          {/* Not offered on a published issue: `saveIssue` refuses one, since
+              its volume, number and year are in other people's bibliographies
+              by then. A button that leads to a form that will not save is
+              worse than no button. */}
+          {issue.state !== "published" && (
+            <Link
+              href={`/editorial/issues/${issue.id}/edit`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-brand-border px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:border-brand hover:bg-brand-tint/50"
+            >
+              <Pencil className="size-3" aria-hidden />
+              Edit issue
+            </Link>
+          )}
         </div>
         {issue.title && (
           <h1 className="mt-2 max-w-3xl font-serif text-xl font-semibold leading-snug tracking-tight md:text-2xl">
@@ -116,10 +122,18 @@ export default async function Page({
 
           {contents.length === 0 ? (
             <div className="mt-3">
+              {/* The second sentence points at the "Available to place"
+                  section, which is not rendered on a published issue — so it
+                  is not said there. An empty state that refers to a list the
+                  reader cannot see is worse than a short one. */}
               <EmptyState
                 icon={ListOrdered}
                 title="Nothing placed yet"
-                description="No manuscript has been scheduled into this issue. Accepted manuscripts waiting for one are listed below."
+                description={
+                  issue.state === "published"
+                    ? "This issue was published with no manuscript scheduled into it."
+                    : "No manuscript has been scheduled into this issue. Accepted manuscripts waiting for one are listed below."
+                }
               />
             </div>
           ) : (
@@ -154,6 +168,8 @@ export default async function Page({
                           <StatusBadge status={submission.status} />
                           {issue.state !== "published" && (
                             <IssueContentsControls
+                              issueId={issue.id}
+                              submissionId={submission.id}
                               title={submission.title}
                               position={item.position}
                               isFirst={i === 0}
@@ -233,7 +249,11 @@ export default async function Page({
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <StatusBadge status={s.status} />
-                      <PlaceInIssueButton title={s.title} />
+                      <PlaceInIssueButton
+                        issueId={issue.id}
+                        submissionId={s.id}
+                        title={s.title}
+                      />
                     </div>
                   </li>
                 ))}
@@ -258,11 +278,20 @@ export default async function Page({
           </section>
         )}
 
-        <Alert tone="warning" title="Nothing here can be changed yet">
-          The controls are built, but none of them saves: placing a manuscript,
-          reordering the contents, setting page numbers and publishing an issue
-          all need a database, and there is not one.
-        </Alert>
+        {/* Placing, reordering and removing all save. What genuinely does not
+            work is publishing, and page numbers, so the notice names those two
+            rather than the whole screen — and it is not shown on an issue that
+            is already published, where it would read as a denial of what the
+            badge at the top of the same screen states. */}
+        {issue.state !== "published" && (
+          <Alert tone="warning" title="This issue cannot be published yet">
+            Its contents save, but publishing mints a DOI for every article the
+            issue carries and the journal has no Crossref prefix, so those
+            identifiers would resolve nowhere. Page numbers are not recorded
+            here either — they are settled in production, once the galleys are
+            final.
+          </Alert>
+        )}
       </div>
     </div>
   );

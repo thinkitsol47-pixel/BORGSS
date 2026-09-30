@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Download, FileText, Upload } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-role";
 import { getSubmissionById } from "@/lib/api/submissions";
 import { SubmissionHeader } from "@/components/portal/submission-header";
+import { RevisionUploadForm } from "@/components/portal/revision-upload-form";
 import { Alert, Card } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import type { SubmissionFile, SubmissionFileKind } from "@/types";
@@ -38,15 +39,29 @@ export default async function Page({
       <SubmissionHeader submission={submission} active="revisions" />
 
       <div className="mt-8 max-w-3xl">
+        {/* The form sits above the history, because an author who opened this
+            tab from a revision request came here to upload, not to read. */}
         {submission.status === "revision-requested" && (
-          <Alert tone="warning" title="Upload is not available yet">
-            <p>
-              The portal cannot accept file uploads while it is being built.
-              Email your revised manuscript and your point-by-point response to
-              the editorial office, quoting{" "}
-              <strong>{submission.reference}</strong>.
-            </p>
-          </Alert>
+          <section aria-labelledby="upload-heading" className="mb-10">
+            <h2
+              id="upload-heading"
+              className="font-serif text-lg font-semibold"
+            >
+              Upload revision {submission.round}
+            </h2>
+            {submission.revisionDueAt && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Due {formatDate(submission.revisionDueAt)}.
+              </p>
+            )}
+            <div className="mt-4">
+              <RevisionUploadForm
+                submissionId={submission.id}
+                reference={submission.reference}
+                round={submission.round}
+              />
+            </div>
+          </section>
         )}
 
         {rounds.length === 0 ? (
@@ -86,18 +101,31 @@ export default async function Page({
                             {KIND_LABELS[f.kind]} · {formatSize(f.sizeBytes)}
                           </p>
                         </div>
-                        {/* Not a link: there is no file store yet, and a
-                            download that 404s is worse than none. */}
-                        <span
-                          className="shrink-0 text-xs text-muted-foreground"
-                          title="Downloads become available when the file store is connected"
-                        >
-                          <Download className="size-4" aria-hidden />
-                          <span className="sr-only">
-                            Download unavailable while the portal is in
-                            development
+                        {/* `/files/<id>` checks who is asking before minting a
+                            ten-minute signed URL. A row with no stored file
+                            stays plain text: a download that 404s reads as the
+                            portal being broken. */}
+                        {f.stored ? (
+                          <a
+                            href={`/files/${f.id}`}
+                            className="shrink-0 rounded-lg p-1.5 text-primary hover:bg-brand-tint"
+                          >
+                            <Download className="size-4" aria-hidden />
+                            <span className="sr-only">
+                              Download {f.filename}
+                            </span>
+                          </a>
+                        ) : (
+                          <span
+                            className="shrink-0 text-xs text-muted-foreground"
+                            title="Recorded before the journal had file storage"
+                          >
+                            <Download className="size-4" aria-hidden />
+                            <span className="sr-only">
+                              Not available for download
+                            </span>
                           </span>
-                        </span>
+                        )}
                       </Card>
                     </li>
                   ))}
@@ -107,21 +135,18 @@ export default async function Page({
           </div>
         )}
 
-        <section className="mt-10 rounded-xl border border-dashed border-brand-border p-6 text-center">
-          <span
-            aria-hidden
-            className="mx-auto grid size-11 place-items-center rounded-xl bg-brand-tint text-brand-dark"
-          >
-            <Upload className="size-5" />
-          </span>
-          <p className="mt-3 font-serif text-base font-semibold">
-            Uploading is not available yet
-          </p>
-          <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
-            File upload arrives with the submission wizard. Until then, send
-            files to the editorial office by email and they will be added here.
-          </p>
-        </section>
+        {/* Only when there is nothing to upload. An author whose manuscript is
+            not awaiting a revision would otherwise read a panel about a form
+            they cannot use. */}
+        {submission.status !== "revision-requested" && (
+          <Alert tone="info" title="No revision is due" className="mt-10">
+            Revisions are uploaded here when an editor asks for them. Nothing is
+            outstanding on{" "}
+            <span className="font-medium">{submission.reference}</span> right
+            now — if you believe a revision was requested, write to the
+            editorial office.
+          </Alert>
+        )}
       </div>
     </div>
   );

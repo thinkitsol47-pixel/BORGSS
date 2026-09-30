@@ -95,10 +95,12 @@ export default async function Page({
         )}
 
         <div className="mt-8">
-          <Alert tone="info" title="Replying is not available yet">
+          {/* Kept: this is the one place an author comes to reply, and the
+              box is what gives them the address and the reference to quote. */}
+          <Alert tone="info" title="To reply, email the editorial office">
             <p>
-              Messaging through the portal arrives with the backend. To reply
-              about this manuscript, email{" "}
+              The portal records correspondence but cannot send it — the journal
+              owns no domain yet. Write to{" "}
               <a
                 href={`mailto:${siteConfig.contact.editorialOffice}?subject=${encodeURIComponent(submission.reference)}`}
                 className="font-medium text-primary hover:text-brand-dark hover:underline"

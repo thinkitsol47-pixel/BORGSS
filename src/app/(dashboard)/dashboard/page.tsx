@@ -24,7 +24,7 @@ import {
   ReviewStatusBadge,
 } from "@/components/portal/review-status";
 import { getReviewerStats } from "@/lib/api/reviews";
-import { Alert, Button, Card } from "@/components/ui";
+import { Button, Card } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import type { Submission } from "@/types";
 
@@ -67,11 +67,6 @@ export default async function DashboardHome() {
         ) : undefined
       }
     >
-      <Alert tone="warning" title="Portal preview">
-        The account shown is a fixed placeholder and nothing is saved — there is
-        no backend yet. The submissions below are sample data used to build the
-        screens.
-      </Alert>
 
       {/* ------------------------------------------------------- author */}
       {stats && (

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
 import { getUserById } from "@/lib/api/admin";
-import { ROLE_LABELS, type Role } from "@/config/roles";
+import { isSuperAdmin, ROLE_LABELS, type Role } from "@/config/roles";
 import { PortalPage } from "@/components/layout/portal-page";
 import { UserDangerZone } from "@/components/portal/user-danger-zone";
 import { Alert, Badge } from "@/components/ui";
@@ -41,6 +41,13 @@ export default async function Page({
 
   const tone = STATUS_TONE[user.status];
   const isSelf = user.id === actor.id;
+
+  // An ordinary administrator may not suspend an administrator, for the same
+  // reason they may not revoke the role: suspension removes access just as
+  // completely, and would be the escalation by another route.
+  const isProtected =
+    !isSuperAdmin(actor.roles) &&
+    user.roles.some((r) => r === "superAdmin" || r === "admin");
 
   return (
     <PortalPage
@@ -131,9 +138,11 @@ export default async function Page({
 
       <div className="mt-10">
         <UserDangerZone
+          userId={user.id}
           name={user.name}
           status={user.status}
           isSelf={isSelf}
+          isProtected={isProtected}
         />
       </div>
     </PortalPage>

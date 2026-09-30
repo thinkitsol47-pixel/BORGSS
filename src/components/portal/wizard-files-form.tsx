@@ -29,6 +29,10 @@ export function WizardFilesForm({ draftId }: { draftId: string }) {
 
   return (
     <form action={formAction} className="space-y-7" noValidate>
+      {/* Which draft these files belong to. The action re-checks that this
+          user owns it rather than trusting the value. */}
+      <input type="hidden" name="draftId" value={draftId} />
+
       {state.status === "error" && state.message && (
         <Alert tone="danger" title="Could not continue">
           {state.message}
@@ -86,10 +90,11 @@ export function WizardFilesForm({ draftId }: { draftId: string }) {
 /**
  * A file input that shows what was chosen.
  *
- * The chosen filename is mirrored into a hidden text field, because there is
- * no upload endpoint: the action can then check that a file *was* selected
- * without any bytes being sent. When the backend lands this becomes a real
- * multipart upload and the hidden field goes.
+ * The bytes are posted for real — a Server Action receives `FormData`, so the
+ * file inputs need no endpoint of their own. The hidden mirror of the filename
+ * is kept because the Zod schema validates *that a file was chosen* before the
+ * action reads any bytes, which keeps the "you forgot the title page" error
+ * cheap and identical to every other field error on the form.
  */
 function FilePicker({
   name,
@@ -147,6 +152,12 @@ function FilePicker({
 
         <input
           id={name}
+          // `name` is what puts the bytes in the FormData — without it the
+          // browser shows the chosen filename and posts nothing, and the action
+          // reports "this file did not reach the server" for a file the author
+          // can plainly see. The hidden mirror below carries only the *name*,
+          // so it cannot stand in for this.
+          name={name}
           type="file"
           accept={accept}
           multiple={multiple}
@@ -227,9 +238,16 @@ export function StepSuccess({
       <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
         {message}
       </p>
+      {/* This used to read "the next step starts empty — nothing carries
+          across without a draft to hold it", written when the wizard held no
+          state. It contradicted the line directly above it, which now says how
+          many files were stored, and it is the exact kind of stale notice that
+          makes a reader doubt the rest of the screen. */}
       <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
-        The next step is shown below so you can see the whole wizard, but it
-        starts empty — nothing carries across without a draft to hold it.
+        Everything you have entered is saved against this submission. You can
+        leave and come back to it from{" "}
+        <span className="font-medium">My submissions</span> — nothing is sent to
+        the editorial office until the final step.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
         <Button href={nextHref}>See the next step</Button>

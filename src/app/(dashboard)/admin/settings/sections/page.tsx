@@ -1,39 +1,37 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { requireGroup } from "@/lib/auth/require-role";
 import { SettingsPage, SourceNote } from "@/components/layout/settings-page";
 import { SectionsEditor } from "@/components/portal/sections-editor";
-import { getAllSubmissions } from "@/lib/api/editorial";
+import { listSections } from "@/lib/api/sections";
 import { ARTICLE_TYPES } from "@/lib/validation/schemas";
 import { Alert } from "@/components/ui";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Sections" };
 
 /**
  * Journal sections and article types.
  *
- * There is no section registry. A submission's `section` is a plain string,
- * and the queue's filter list is derived from whatever strings the data
- * happens to contain — so this screen compares the **declared** scope (the
- * public aims & scope page) against the **used** sections (what is actually on
- * manuscripts), and names the difference.
+ * **Sections are a registry now**, which is what earlier revisions of this
+ * screen said they should become. `Section` is a table and a submission holds
+ * a foreign key to it, so a manuscript cannot be filed under a name that does
+ * not exist, and renaming one moves every manuscript with it.
  *
- * That comparison is the whole value of the page. It found a real drift on its
- * first run: manuscripts filed under "Gender Studies", which is not one of the
- * ten declared subject areas — the declared name is "Gender & Development".
- * Two names for one section split its queue filter in half and would split its
- * statistics too.
+ * That closed the drift this page was built to expose: manuscripts filed under
+ * "Gender Studies" when the declared area was "Gender & Development". Two names
+ * for one subject area split its queue filter in half and split its statistics.
+ * The comparison below is kept anyway, because a registry stops names diverging
+ * from *each other* but not from the public aims & scope page — the one list
+ * that is still prose, and the one authors actually read.
  */
 
 /**
  * The ten subject areas the journal publicly declares.
  *
- * Mirrored from `/about/aims-scope`, which is the page authors read before
- * choosing where to submit. It is a hand-copied list because the scope page
- * holds them as prose with descriptions; that duplication is itself worth
- * seeing, and is noted below.
+ * Still hand-copied from `/about/aims-scope`, which holds them as prose with a
+ * description each. The duplication is worth seeing rather than hiding: it is
+ * why a section can be added here and still be invisible to authors.
  */
 const DECLARED_SECTIONS = [
   "Economics & Development",
@@ -51,18 +49,15 @@ const DECLARED_SECTIONS = [
 export default async function Page() {
   await requireGroup("adminOnly");
 
-  const submissions = await getAllSubmissions();
+  const sections = await listSections();
 
-  // Count per section from the manuscripts themselves — the only source there
-  // actually is.
-  const counts = new Map<string, number>();
-  for (const s of submissions) {
-    counts.set(s.section, (counts.get(s.section) ?? 0) + 1);
-  }
-
-  const used = [...counts.keys()].sort();
-  const undeclared = used.filter((s) => !DECLARED_SECTIONS.includes(s));
-  const unused = DECLARED_SECTIONS.filter((s) => !counts.has(s));
+  const undeclared = sections.filter(
+    (s) => s.active && !DECLARED_SECTIONS.includes(s.name),
+  );
+  const missing = DECLARED_SECTIONS.filter(
+    (name) => !sections.some((s) => s.name === name),
+  );
+  const empty = sections.filter((s) => s.active && s.submissionCount === 0);
 
   return (
     <SettingsPage
@@ -70,29 +65,47 @@ export default async function Page() {
       title="Sections"
       lead="The subject sections manuscripts are filed under, and the article types the journal accepts."
     >
-      {/* A section name that exists on manuscripts but not in the declared
-          scope is a real defect, not a cosmetic one, so it leads. */}
+      {/* A section offered to authors but absent from the public scope page is
+          the drift that survives a registry, so it still leads. */}
       {undeclared.length > 0 && (
         <Alert
           tone="warning"
-          title={`${undeclared.length} section ${undeclared.length === 1 ? "name is" : "names are"} not in the declared scope`}
+          title={`${undeclared.length} section ${undeclared.length === 1 ? "is" : "are"} not in the declared scope`}
         >
           <p>
-            <span className="font-medium">{undeclared.join(", ")}</span>{" "}
-            {undeclared.length === 1 ? "appears" : "appear"} on submitted
-            manuscripts but {undeclared.length === 1 ? "is" : "are"} not among
-            the ten subject areas on the{" "}
+            <span className="font-medium">
+              {undeclared.map((s) => s.name).join(", ")}
+            </span>{" "}
+            {undeclared.length === 1 ? "is offered" : "are offered"} to authors
+            but {undeclared.length === 1 ? "is" : "are"} not among the ten
+            subject areas on the{" "}
             <Link href="/about/aims-scope" className="font-medium underline">
               aims &amp; scope page
             </Link>
             .
           </p>
           <p className="mt-2">
-            Because a section is a plain string rather than a registry entry,
-            nothing prevents this. Two names for one subject area split its
-            queue filter in half, split its statistics, and leave an author
-            filing under a heading the journal never advertised. Reconciling the
-            names is the fix; a registry with a fixed list is the prevention.
+            The registry keeps section names consistent with each other, but the
+            public scope list is prose on that page — so adding a section here
+            does not advertise it. Either add it there, or stop offering it.
+          </p>
+        </Alert>
+      )}
+
+      {missing.length > 0 && (
+        <Alert
+          tone="warning"
+          title={`${missing.length} declared ${missing.length === 1 ? "area is" : "areas are"} not in the registry`}
+          className="mt-4"
+        >
+          <p>
+            <span className="font-medium">{missing.join(", ")}</span>{" "}
+            {missing.length === 1 ? "is advertised" : "are advertised"} on the
+            aims &amp; scope page but{" "}
+            {missing.length === 1 ? "has" : "have"} no section here, so no author
+            can choose {missing.length === 1 ? "it" : "them"}. Add{" "}
+            {missing.length === 1 ? "it" : "them"} below, or remove{" "}
+            {missing.length === 1 ? "it" : "them"} from that page.
           </p>
         </Alert>
       )}
@@ -103,36 +116,30 @@ export default async function Page() {
           Subject sections
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          The ten declared areas, with how many manuscripts sit in each. A
-          section with no manuscripts is still listed — an empty area is
-          information, and a list whose rows appear and disappear cannot be
-          compared between two readings.
+          What the submission wizard offers an author, and what the editorial
+          queue filters by. A section with no manuscripts is still listed — an
+          empty area is information, and a list whose rows appear and disappear
+          cannot be compared between two readings.
         </p>
 
-        <SectionsEditor
-          initial={[
-            ...DECLARED_SECTIONS.map((name) => ({
-              name,
-              count: counts.get(name) ?? 0,
-              declared: true,
-            })),
-            // Undeclared names are listed in place, marked — not filtered out.
-            // Hiding them is how the drift survives.
-            ...undeclared.map((name) => ({
-              name,
-              count: counts.get(name) ?? 0,
-              declared: false,
-            })),
-          ]}
-        />
+        <div className="mt-4">
+          <SectionsEditor
+            sections={sections.map((s) => ({
+              id: s.id,
+              name: s.name,
+              active: s.active,
+              submissionCount: s.submissionCount,
+              declared: DECLARED_SECTIONS.includes(s.name),
+            }))}
+          />
+        </div>
 
-        {unused.length > 0 && (
+        {empty.length > 0 && (
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            {unused.length} of the ten declared areas have received no
-            manuscripts yet. That is normal for a journal with{" "}
-            {submissions.length} in the workflow and is not a reason to remove
-            them — the scope is a statement of what the journal will consider,
-            not a record of what it has received.
+            {empty.length} of the sections on offer have received no manuscripts
+            yet. That is normal, and not a reason to remove them — the scope is a
+            statement of what the journal will consider, not a record of what it
+            has received.
           </p>
         )}
       </section>
@@ -143,9 +150,11 @@ export default async function Page() {
           Article types
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Unlike sections, these <em>are</em> a fixed list. `ARTICLE_TYPES` in
-          the validation schemas is what the submission wizard offers and what
-          it validates against, so an author cannot invent one.
+          Unlike sections, these are a fixed list in the code.{" "}
+          <code className="font-mono text-[0.9em]">ARTICLE_TYPES</code> is what
+          the submission wizard offers and what it validates against, and the
+          database has a matching enum — so an author cannot invent one, and
+          neither can an administrator.
         </p>
 
         <ul className="mt-3 divide-y rounded-xl border">
@@ -169,26 +178,29 @@ export default async function Page() {
         <p className="mt-3 flex items-start gap-1.5 text-sm text-muted-foreground">
           <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
           <span>
-            Because this list is typed, adding a type without giving it a label
+            An article type is a workflow decision, not a setting: adding one
+            means deciding how it is reviewed and what its template looks like.
+            Because the list is typed, adding a type without giving it a label
             is a compile error rather than a blank radio button.
           </span>
         </p>
       </section>
 
-      <SourceNote file="src/lib/validation/schemas.ts · src/app/(marketing)/about/aims-scope/page.tsx">
+      <SourceNote file="Section table · src/lib/validation/schemas.ts">
         <p>
-          Article types are <code className="font-mono text-[0.9em]">ARTICLE_TYPES</code>{" "}
-          in the schemas. Subject sections have{" "}
-          <span className="font-medium">no single source</span>: the public list
-          is prose on the aims &amp; scope page, the list this screen compares
-          against is copied from it, and what manuscripts actually carry is a
-          free string.
+          Sections are rows in the{" "}
+          <code className="font-mono text-[0.9em]">Section</code> table, and each
+          submission holds a foreign key to one. Renaming a section therefore
+          moves every manuscript filed under it, and no manuscript can carry a
+          name that is not in the list.
         </p>
         <p className="mt-2">
-          When the backend lands, sections should become a real registry — a
-          table with a name, a slug and an active flag, referenced by id from
-          each submission. That is what makes the warning above impossible
-          rather than merely visible.
+          Article types stay in{" "}
+          <code className="font-mono text-[0.9em]">ARTICLE_TYPES</code> and in a
+          database enum. The one list still without a single source is the
+          public aims &amp; scope page, which holds its ten areas as prose — the
+          two warnings above exist to catch that page and this registry
+          disagreeing.
         </p>
       </SourceNote>
     </SettingsPage>

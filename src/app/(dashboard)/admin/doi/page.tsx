@@ -89,7 +89,7 @@ export default async function Page({
     : undefined;
 
   const { items, counts } = await listDoiRecords(state);
-  const prefix = hasCrossrefPrefix();
+  const prefix = await hasCrossrefPrefix();
 
   return (
     <PortalPage
@@ -301,14 +301,9 @@ export default async function Page({
         </dl>
       </section>
 
-      <div className="mt-8">
-        <Alert tone="warning" title="Depositing is not built yet">
-          The deposit and retry controls are built but disabled, and nothing
-          here talks to Crossref. There could not be a deposit — the journal has
-          no member account and no prefix. When both exist, this screen becomes
-          the place deposits are made from and failures retried.
-        </Alert>
-      </div>
+      {/* The missing prefix is already stated at the top of this page and on
+          the deposit buttons themselves, which are disabled and say so. A third
+          telling at the foot was the one nobody read. */}
     </PortalPage>
   );
 }
