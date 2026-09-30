@@ -14,6 +14,8 @@ npm run dev
 
 Open http://localhost:3000
 
+Deployed on Vercel from the `main` branch — every push to `main` redeploys.
+
 ## Scripts
 
 | Command | Purpose |
