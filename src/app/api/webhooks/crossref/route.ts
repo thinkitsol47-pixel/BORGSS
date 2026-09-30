@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 
-/** Crossref deposit callback (stub). Records deposit success/failure. */
-export async function POST(request: Request) {
-  const body = await request.text();
-  console.log("[crossref webhook]", body.slice(0, 500));
-  return NextResponse.json({ ok: true });
+/**
+ * Crossref deposit callback (stub). Will record deposit success/failure once
+ * the journal has a prefix. Until then it is unauthenticated and does nothing,
+ * so it says so rather than logging whatever anyone posts to it.
+ */
+export async function POST() {
+  return NextResponse.json(
+    { error: "Crossref deposits are not set up yet" },
+    { status: 501 },
+  );
 }

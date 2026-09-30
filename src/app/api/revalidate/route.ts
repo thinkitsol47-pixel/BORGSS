@@ -7,8 +7,11 @@ import { NextResponse } from "next/server";
  * POST { path?: string, tag?: string }  with header x-revalidate-secret
  */
 export async function POST(request: Request) {
+  const expected = process.env.REVALIDATE_SECRET;
   const secret = request.headers.get("x-revalidate-secret");
-  if (secret !== process.env.REVALIDATE_SECRET) {
+  // Unset, or still the `.env.example` placeholder, means closed — not open to
+  // anyone who reads that placeholder in the public repository.
+  if (!expected || expected === "change-me" || secret !== expected) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
   const { path, tag } = await request.json().catch(() => ({}));

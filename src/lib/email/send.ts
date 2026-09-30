@@ -55,8 +55,9 @@ function fromAddress(): string {
  * already made once. Drives the wording, not the sending.
  */
 export function canReachRecipients(): boolean {
-  const from = process.env.EMAIL_FROM ?? "";
-  return Boolean(process.env.RESEND_API_KEY) && !from.includes("resend.dev");
+  // Read the address actually sent from, so an unset EMAIL_FROM — which falls
+  // back to resend.dev — is not mistaken for a verified domain.
+  return Boolean(process.env.RESEND_API_KEY) && !fromAddress().includes("resend.dev");
 }
 
 /** Whether email is wired up at all. */
