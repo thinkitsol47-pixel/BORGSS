@@ -12,9 +12,8 @@ import { DashboardTopbar } from "@/components/layout/dashboard-topbar";
  * different jobs: robots.txt asks a crawler not to *fetch*, this tag asks it
  * not to *index* a page it reached some other way — a shared link, a referrer.
  *
- * It matters here because these routes are currently reachable without signing
- * in: there is no auth and no middleware. Neither of these is a substitute for
- * that; they are the part that can be done today.
+ * Neither is access control — `middleware.ts` and `requireUser()` below are.
+ * These only keep a portal URL out of search results if one leaks.
  */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },

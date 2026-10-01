@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { type Role } from "@/config/roles";
 import { supabaseServer } from "./supabase";
 import { db } from "@/lib/db";
@@ -99,8 +100,16 @@ async function loadProfile(userId: string) {
  * The profile read goes through `loadProfile`, which retries once on a dropped
  * connection — see the note there for why this one query earns that and the
  * rest of the app does not.
+ *
+ * **Memoised per request with React `cache()`.** The portal layout and the page
+ * inside it both guard themselves, so without this every portal render made two
+ * round trips to Supabase Auth and two profile queries before the page's own
+ * data — each one crossing to the database's region. The cache lives for one
+ * request only, so a role granted a moment ago is still read on the next one.
  */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(loadCurrentUser);
+
+async function loadCurrentUser(): Promise<CurrentUser | null> {
   const { data } = await supabaseServer().auth.getUser();
   const authUser = data.user;
 

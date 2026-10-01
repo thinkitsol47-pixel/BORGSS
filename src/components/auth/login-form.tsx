@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useFormState } from "react-dom";
 import { LogIn, Mail } from "lucide-react";
 import { signIn, type AuthState } from "@/app/(auth)/actions";
@@ -13,7 +12,6 @@ const initialState: AuthState = { status: "idle" };
 
 export function LoginForm({ next }: { next?: string }) {
   const [state, formAction] = useFormState(signIn, initialState);
-  const router = useRouter();
   const v = state.values ?? {};
 
   /**
@@ -26,16 +24,18 @@ export function LoginForm({ next }: { next?: string }) {
    * form. By the time this effect runs the response (and its cookie) has been
    * received, so the navigation lands signed in.
    *
-   * `replace`, not `push`: the Back button should not return to a sign-in
-   * form the visitor has already completed. `refresh()` discards the router
-   * cache, which still holds the signed-out render of the portal shell.
+   * A full page load, not `router.replace()` + `router.refresh()`. The pair
+   * raced: the refresh re-rendered /login, whose server guard now saw a
+   * session and redirected, and the form vanished while the portal was still
+   * loading — a blank panel that looked like a failed sign-in. A hard
+   * navigation has one outcome, starts with no stale router cache, and
+   * `replace` keeps the completed form out of the Back history.
    */
   useEffect(() => {
     if (state.status === "success" && state.redirectTo) {
-      router.replace(state.redirectTo);
-      router.refresh();
+      window.location.replace(state.redirectTo);
     }
-  }, [state.status, state.redirectTo, router]);
+  }, [state.status, state.redirectTo]);
 
   return (
     <>
