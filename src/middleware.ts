@@ -12,10 +12,17 @@ import { NextResponse, type NextRequest } from "next/server";
  * visitor clicked something. `getUser()` here performs the refresh, and the
  * response carries the new cookies out.
  *
- * `getUser()`, never `getSession()`. `getSession()` reads the cookie and
- * believes it; `getUser()` verifies the token with Supabase. A cookie is
- * attacker-controlled input, and this function decides whether someone reaches
- * the editorial queue.
+ * `getClaims()`, never `getSession()`. `getSession()` reads the cookie and
+ * believes it; `getClaims()` verifies the token's signature against the
+ * project's published ES256 keys (fetched once, then cached), refreshing an
+ * expired session first. A cookie is attacker-controlled input, and this
+ * function decides whether someone reaches the editorial queue.
+ *
+ * It replaced `getUser()` here for speed: that asked Supabase's servers on every
+ * click, a round trip from the edge to the database region before the page
+ * could even start. What `getClaims()` cannot see is a session revoked since the
+ * token was minted — so `getCurrentUser()`, which every portal page runs, still
+ * uses `getUser()`. The middleware turns away the signed-out; the page decides.
  *
  * **There is no exception.** A demo door used to skip this redirect outside
  * production, so the whole portal was browsable with no account at all. It was
@@ -49,11 +56,9 @@ export async function middleware(request: NextRequest) {
 
   // Refreshes the token as a side effect. Do not remove even where the result
   // is unused: this call is what keeps a session alive.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data, error } = await supabase.auth.getClaims();
 
-  if (!user) {
+  if (error || !data?.claims?.sub) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     // Carried so sign-in returns the visitor to what they were reaching for.
