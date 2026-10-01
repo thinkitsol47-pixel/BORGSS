@@ -1078,7 +1078,10 @@ async function main() {
         }
       }
 
-      for (const d of mockDoiRecords) {
+      // Every DOI record hangs off an Article, and Articles are only seeded
+      // with SEED_PUBLIC=1 — without this guard a fresh database fails here on
+      // the foreign key.
+      for (const d of seedPublic ? mockDoiRecords : []) {
         await tx.doiRecord.create({
           data: {
             id: doiRecordId(d.id),
