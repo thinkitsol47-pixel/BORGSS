@@ -359,5 +359,6 @@ export async function resendVerification(
   };
 }
 
-/* Sign-out is `src/app/logout/route.ts`, not an action here: the topbar's
-   control is a link, and a GET route keeps it working without JavaScript. */
+/* Sign-out is `src/app/logout/route.ts`, not an action here: the topbar posts
+   a plain form to it, which works without JavaScript. It is POST only — a GET
+   sign-out link was prefetched by Next and ended sessions on its own. */

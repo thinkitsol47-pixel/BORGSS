@@ -140,11 +140,19 @@ function AccountMenu({
             View site
           </MenuLink>
           <div className="mt-1 border-t pt-1">
-            {/* Revokes the Supabase session and clears the demo cookie, then
-                returns to the sign-in page. */}
-            <MenuLink href="/logout" icon={LogOut}>
-              Sign out
-            </MenuLink>
+            {/* A form, not a link: Next prefetches visible links, and a
+                prefetched sign-out link ended the session as soon as this
+                menu opened. See src/app/logout/route.ts. */}
+            <form action="/logout" method="post">
+              <button
+                type="submit"
+                role="menuitem"
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-brand-tint hover:text-brand-darker"
+              >
+                <LogOut className="size-4 shrink-0" />
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
       )}
