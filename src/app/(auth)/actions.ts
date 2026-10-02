@@ -11,7 +11,7 @@ import { supabaseServer, supabaseAdmin } from "@/lib/auth/supabase";
 import { db } from "@/lib/db";
 import type { Role } from "@/config/roles";
 import { sendEmail } from "@/lib/email/send";
-import { welcomeEmail } from "@/lib/email/templates";
+import { verificationEmail } from "@/lib/email/templates";
 
 /**
  * Auth Server Actions, on Supabase Auth.
@@ -21,11 +21,12 @@ import { welcomeEmail } from "@/lib/email/templates";
  * notification settings the portal renders. `User.id` *is* the `auth.users` id
  * — decided in phase 1 precisely so that no second key has to be kept in step.
  *
- * **What still does not work:** anything that needs an email to arrive.
- * Supabase's built-in mailer is rate-limited to a handful of messages an hour
- * and is not a delivery service, so password reset and address verification
- * stay incomplete until Resend lands in phase 6. Both actions below say so on
- * screen rather than reporting a success the visitor's inbox will contradict.
+ * **Two senders, one domain** (since 2026-10-01). Address verification is
+ * minted here with `generateLink` and sent through Resend by `sendEmail`, so the
+ * wording is ours. The password-reset link is sent by Supabase itself, through
+ * custom SMTP pointed at Resend (`no-reply@borjss.online`) — set in the
+ * Supabase dashboard, not in this repository. If reset mail stops arriving,
+ * look there first.
  */
 
 export type AuthState = {
@@ -48,6 +49,12 @@ export type AuthState = {
    * with a normal response, and the client navigates once it has it.
    */
   redirectTo?: string;
+  /**
+   * Set when the password was right but the address was never confirmed, so
+   * the form can offer a fresh link instead of a dead end. Only reachable with
+   * the correct password, so it tells an attacker nothing new.
+   */
+  unconfirmedEmail?: string;
 };
 
 /** Collects Zod issues into the flat shape the forms render. */
@@ -93,6 +100,16 @@ export async function signIn(
     email,
     password: parsed.data.password,
   });
+
+  if (error?.code === "email_not_confirmed") {
+    return {
+      status: "error",
+      message:
+        "This email address has not been confirmed yet. Open the link we emailed you when you registered, or send a new one.",
+      values: safeValues(raw),
+      unconfirmedEmail: email,
+    };
+  }
 
   if (error) {
     // Deliberately one message for both "no such account" and "wrong password".
@@ -158,20 +175,22 @@ export async function register(
   // The auth account first. Its generated id becomes the profile's primary key,
   // so this has to succeed before there is anything to write a profile against.
   //
-  // `email_confirm: true` because no mail provider is connected yet (phase 6):
-  // leaving it false would create accounts that can never sign in, since the
-  // confirmation link would never arrive. **Set this back to false when Resend
-  // lands** — until then an unverified address can register, which is the
-  // honest trade for the flow working at all.
-  const created = await admin.auth.admin.createUser({
+  // **Unconfirmed until the emailed link is followed.** `generateLink` creates
+  // the account exactly as `signUp` would — Supabase then refuses its password
+  // with `email_not_confirmed` — but sends nothing itself and returns the
+  // token, so the message goes out through `sendEmail` in the journal's own
+  // words rather than Supabase's template.
+  const created = await admin.auth.admin.generateLink({
+    type: "signup",
     email,
     password: d.password,
-    email_confirm: true,
-    user_metadata: { name: d.name },
+    options: { data: { name: d.name } },
   });
 
   if (created.error || !created.data.user) {
-    const already = /already|exists|registered/i.test(created.error?.message ?? "");
+    const already =
+      created.error?.code === "email_exists" ||
+      /already|exists|registered/i.test(created.error?.message ?? "");
     return {
       status: "error",
       message: already
@@ -196,9 +215,10 @@ export async function register(
         affiliation: d.institution,
         country: d.country,
         orcid: d.orcid || null,
-        // `active`, not `invited`: they registered themselves and can sign in
-        // now. `invited` is for an account the office created for someone who
-        // has not yet appeared.
+        // `active`, not `invited`: they registered themselves. Whether they
+        // can sign in yet is Supabase's to decide — it waits on the emailed
+        // link. `invited` is for an account the office created for someone
+        // who has not yet appeared.
         status: "active",
         roles: { create: roles.map((role) => ({ role })) },
       },
@@ -216,16 +236,22 @@ export async function register(
     };
   }
 
-  // Not awaited for its result beyond logging: the account exists either way,
-  // and a mail failure must not turn a successful registration into an error
-  // the visitor would retry — producing "this address is already registered".
-  const mail = await sendEmail(welcomeEmail({ to: email, name: d.name }));
+  // A mail failure is reported, not thrown: the account exists either way, and
+  // turning success into an error would make the visitor retry into "this
+  // address is already registered". The next page offers a fresh link.
+  const mail = await sendEmail(
+    verificationEmail({
+      to: email,
+      name: d.name,
+      link: confirmLink(created.data.properties.hashed_token),
+    }),
+  );
 
   return {
     status: "success",
     message: mail.ok
-      ? "Your account has been created and a confirmation is on its way. You can sign in now."
-      : "Your account has been created — you can sign in now. No confirmation email was sent; email delivery is still being set up.",
+      ? "Your account has been created. We have emailed a link to confirm your address — open it to finish, and then you can sign in."
+      : "Your account has been created, but the confirmation email could not be sent. Use “Send the link again” on the next page, or contact the editorial office.",
     values: { email },
   };
 }
@@ -263,20 +289,27 @@ export async function requestPasswordReset(
     { redirectTo: `${siteUrl()}/auth/callback?next=/reset-password` },
   );
 
-  // TODO(phase 6): Supabase's built-in mailer is rate-limited to a few messages
-  // an hour and is not a delivery service. Until Resend is connected, a reset
-  // link may not arrive at all — which is why the message below says so rather
-  // than promising an email the visitor will sit waiting for.
   return {
     status: "success",
     message:
-      "If an account exists for that address, a reset link is on its way. Email delivery is still being set up, so if nothing arrives within a few minutes, contact the editorial office.",
+      "If an account exists for that address, a reset link is on its way. Check your spam folder if it has not arrived within a few minutes.",
   };
 }
 
 /** The origin reset and verification links come back to. */
 function siteUrl(): string {
   return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+}
+
+/**
+ * The emailed confirmation link. It opens `/verify-email`, whose button posts
+ * the `token_hash` to `/auth/confirm` — never the confirming route directly,
+ * because mail scanners open links and would spend the single-use token. A
+ * `token_hash`, unlike a PKCE `code`, works on a different device or browser
+ * from the one that registered.
+ */
+function confirmLink(tokenHash: string): string {
+  return `${siteUrl()}/verify-email?token_hash=${encodeURIComponent(tokenHash)}`;
 }
 
 /* --------------------------------------------------------- reset password */
@@ -335,7 +368,7 @@ export async function resendVerification(
   _prev: AuthState,
   formData: FormData,
 ): Promise<AuthState> {
-  const email = String(formData.get("email") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
 
   if (!email) {
     return {
@@ -344,19 +377,47 @@ export async function resendVerification(
     };
   }
 
-  // Registration currently confirms addresses on creation (see `register`),
-  // because no mail provider is connected — so there is nothing outstanding to
-  // re-send, and calling Supabase would either fail or send a link that cannot
-  // be delivered. Saying so beats a success message the inbox contradicts.
-  //
-  // TODO(phase 6): with Resend connected, set `email_confirm: false` in
-  // `register` and make this call `supabase.auth.resend({ type: "signup", email })`,
-  // rate limited per address.
-  return {
+  // The same answer whatever happens below. The address arrives in a URL, so
+  // saying "no such account" or "already confirmed" would let anyone test
+  // which addresses are registered.
+  const answer: AuthState = {
     status: "success",
     message:
-      "Email verification is not connected yet, so nothing has been sent — and nothing is waiting on it. Your account is already usable; sign in with the password you chose.",
+      "If that address has an account waiting to be confirmed, a new link is on its way. Check your spam folder if it has not arrived within a few minutes.",
   };
+
+  const profile = await db.user.findUnique({
+    where: { email },
+    select: { id: true, name: true },
+  });
+  if (!profile) return answer;
+
+  const admin = supabaseAdmin();
+  const { data: found } = await admin.auth.admin.getUserById(profile.id);
+  // Seeded profiles have no auth account; a confirmed one needs nothing.
+  if (!found.user || found.user.email_confirmed_at) return answer;
+
+  // At most one link a minute. Minting a link rewrites the auth row, so its
+  // `updated_at` is when the last one went out — without this, the button is a
+  // way to fill a stranger's inbox.
+  const last = Date.parse(found.user.updated_at ?? "");
+  if (Number.isFinite(last) && Date.now() - last < 60_000) return answer;
+
+  // A magic-link token, because a second "signup" link for an existing account
+  // is refused. Following it confirms the address just the same — verified
+  // against this project before it was written.
+  const link = await admin.auth.admin.generateLink({ type: "magiclink", email });
+  if (!link.error) {
+    await sendEmail(
+      verificationEmail({
+        to: email,
+        name: profile.name,
+        link: confirmLink(link.data.properties.hashed_token),
+      }),
+    );
+  }
+
+  return answer;
 }
 
 /* Sign-out is `src/app/logout/route.ts`, not an action here: the topbar posts

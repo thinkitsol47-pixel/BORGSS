@@ -40,25 +40,30 @@ function signOff(): string {
 /* ------------------------------------------------------------- the account */
 
 /**
- * Sent when someone registers.
+ * Sent when someone registers, and again when they ask for a fresh link.
  *
- * Deliberately **not** a "confirm your address" message. Registration currently
- * confirms addresses on creation because a confirmation link cannot be
- * delivered reliably yet, so asking someone to click one would be asking for
- * something that does nothing. When Resend has a verified domain and
- * `email_confirm` goes back to `false`, this becomes the verification message
- * and gains a link.
+ * The account cannot sign in until this link is followed — Supabase refuses
+ * the password with `email_not_confirmed` — so the message leads with the link
+ * and says plainly what happens if it is ignored. The link is single-use and
+ * lands on `/auth/confirm`, which confirms the address and signs them in.
  */
-export function welcomeEmail(params: { to: string; name: string }): EmailMessage {
+export function verificationEmail(params: {
+  to: string;
+  name: string;
+  link: string;
+}): EmailMessage {
   return {
     to: params.to,
     replyTo: EDITORIAL_OFFICE,
-    subject: `Your ${journalName()} account`,
+    subject: `Confirm your email address for ${journalName()}`,
     text:
       `Dear ${params.name},\n\n` +
-      `An account has been created for you at ${journalName()} with this email address. ` +
-      `You can sign in with the password you chose.\n\n` +
-      `If you did not create this account, please reply to this message and we will remove it.` +
+      `An account has been created at ${journalName()} with this email address. ` +
+      `To finish setting it up, confirm the address by opening this link:\n\n` +
+      `${params.link}\n\n` +
+      `The link works once. You will not be able to sign in until the address is confirmed; ` +
+      `if the link has expired, request a new one from the sign-in page.\n\n` +
+      `If you did not create this account, ignore this message — nothing further will happen.` +
       signOff(),
   };
 }

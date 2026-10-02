@@ -28,9 +28,9 @@ export type ContactState = {
  *
  * **The row is the record and the mail is a courtesy**, in that order: a send
  * that fails does not fail the action, because a message sitting in the queue
- * has reached the office whether or not an email announced it. Note that with
- * no verified domain the receipt to the sender is refused by the provider, so
- * the success text promises the office has it and does not mention an inbox.
+ * has reached the office whether or not an email announced it. That is also
+ * why the success text promises the office has it and does not promise an
+ * inbox: the receipt usually arrives, but the action does not wait to know.
  */
 export async function submitContact(
   _prev: ContactState,
@@ -100,9 +100,8 @@ export async function submitContact(
 
     return {
       status: "success",
-      // No delivery claim: with no verified domain, mail to the sender is
-      // refused by the provider, and telling them to watch their inbox would
-      // be telling them something untrue.
+      // No delivery claim: the row is what reached the office, and a receipt
+      // that lands in spam would make "check your inbox" look untrue.
       message:
         "Thank you — your message has reached the editorial office. We reply to most enquiries within two working days.",
     };

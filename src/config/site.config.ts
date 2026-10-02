@@ -40,10 +40,12 @@ export const siteConfig = {
    * An address that bounces is worse than no address, because the sender
    * believes they have been in touch.
    *
-   * **When the domain is bought**, point these back at it — one edit here
-   * changes every screen — and set `EMAIL_FROM` to an address on it. Until
-   * then a single real mailbox is the honest answer, even though four roles
-   * share it.
+   * **Keep them on this Gmail — the owner's decision (2026-10-01).** The
+   * journal now owns `borjss.online`, and mail is *sent* from an address on it
+   * (`EMAIL_FROM`), but that domain has no inbox. Every address a person might
+   * write to or reply to stays here, so one mailbox the owner reads receives
+   * everything. Do not "point these at the domain" without a real mailbox
+   * behind it; that is exactly the bounce described above.
    */
   contact: {
     editorialOffice: "ceoborjss@gmail.com",

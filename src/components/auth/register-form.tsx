@@ -83,7 +83,7 @@ export function RegisterForm() {
       <AuthResult
         icon={CheckCircle2}
         tone="success"
-        title="Details validated"
+        title="Account created"
         actions={
           <>
             {state.values?.email && (
@@ -96,14 +96,14 @@ export function RegisterForm() {
               </Button>
             )}
             <p className="text-sm text-muted-foreground">
-              In the meantime, write to the{" "}
+              Problems with the link? Write to the{" "}
               <Link
                 href="/contact"
                 className="font-medium text-primary hover:text-brand-dark"
               >
                 editorial office
-              </Link>{" "}
-              if you need to reach us.
+              </Link>
+              .
             </p>
           </>
         }

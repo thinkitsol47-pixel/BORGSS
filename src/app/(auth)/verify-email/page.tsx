@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CheckCircle2, Link2Off, MailOpen } from "lucide-react";
+import { Link2Off, MailCheck, MailOpen } from "lucide-react";
 import { Button } from "@/components/ui";
-import { ScaffoldNotice } from "@/components/auth/auth-parts";
 import { AuthResult } from "@/components/auth/auth-result";
 import { ResendVerification } from "@/components/auth/resend-verification";
 
@@ -13,39 +12,70 @@ export const metadata: Metadata = {
 };
 
 /**
- * Three states, chosen by the query string:
+ * Four states, chosen by the query string:
  *
- *   ?token=…             the link was followed — confirm the address
- *   ?email=…             registration just finished — tell them to check inbox
- *   (neither)            landed here directly
+ *   ?token_hash=…        the emailed link was followed — offer the confirm button
+ *   ?error=invalid|missing  the button was pressed and the token was refused
+ *   ?email=…             registration just finished — check the inbox
+ *   (none)               landed here directly
  *
- * SCAFFOLD: no token is actually verified. Once the backend exists this page
- * checks the token server-side and shows the real success or failure.
+ * **The link does not confirm on arrival.** Mail filters open links to scan
+ * them, and the token is single-use, so confirming on GET would let a scanner
+ * spend it before the person clicked. The button posts to `/auth/confirm`.
  */
 export default function Page({
   searchParams,
 }: {
-  searchParams?: { token?: string; email?: string };
+  searchParams?: { token_hash?: string; email?: string; error?: string };
 }) {
-  const token = searchParams?.token?.trim();
+  const tokenHash = searchParams?.token_hash?.trim();
   const email = searchParams?.email?.trim();
+  const error = searchParams?.error;
 
-  if (token) {
+  if (tokenHash) {
     return (
       <AuthResult
-        icon={CheckCircle2}
-        title="Verification link received"
+        icon={MailCheck}
+        title="Confirm your email address"
         actions={
-          <Button href="/login" className="w-full" size="lg">
-            Go to sign in
-          </Button>
+          <form action="/auth/confirm" method="post">
+            <input type="hidden" name="token_hash" value={tokenHash} />
+            <Button type="submit" className="w-full" size="lg">
+              Confirm and sign in
+            </Button>
+          </form>
         }
       >
         <p>
-          Email verification is not live yet, so this link has not been checked
-          and no address has been confirmed. Once the account system is running,
-          following a link like this one will verify your address and take you
-          straight to the portal.
+          One step left. Confirming the address finishes setting up your account
+          and signs you in.
+        </p>
+      </AuthResult>
+    );
+  }
+
+  if (error) {
+    return (
+      <AuthResult
+        icon={Link2Off}
+        tone="warning"
+        title="This link has expired"
+        actions={
+          <>
+            <Button href="/login" className="w-full" size="lg">
+              Go to sign in
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Sign in with your email and password — if the address still needs
+              confirming, the sign-in page will offer to send a new link.
+            </p>
+          </>
+        }
+      >
+        <p>
+          Confirmation links work once. This one has already been used or is too
+          old. If you have already confirmed your address, you can simply sign
+          in.
         </p>
       </AuthResult>
     );
@@ -72,22 +102,16 @@ export default function Page({
         }
       >
         <p>
-          We would send a verification link to{" "}
+          We have sent a confirmation link to{" "}
           <span className="break-all font-medium text-foreground">{email}</span>
-          . Follow it to confirm the address and finish setting up your account.
+          . Open it to confirm the address — you can sign in once it is
+          confirmed.
         </p>
-
-        <div className="mt-5 text-left">
-          <ScaffoldNotice title="Nothing is waiting on this" tone="info">
-            No message has been sent — email delivery is still being set up.
-            Your account works regardless, so you can sign in now.
-          </ScaffoldNotice>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Links expire after 24 hours. If one does not arrive, check the spam
-            folder first — verification mail is a common casualty of
-            institutional filters.
-          </p>
-        </div>
+        <p className="mt-3 text-xs leading-relaxed">
+          If it has not arrived within a few minutes, check the spam folder
+          first — confirmation mail is a common casualty of institutional
+          filters.
+        </p>
       </AuthResult>
     );
   }
@@ -114,7 +138,7 @@ export default function Page({
       }
     >
       <p>
-        This page confirms an email address when you follow a verification link.
+        This page confirms an email address when you follow a confirmation link.
         Open the link from your inbox, or copy the whole address into your
         browser if your email client split it across lines.
       </p>

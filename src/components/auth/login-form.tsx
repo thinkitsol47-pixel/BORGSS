@@ -49,6 +49,17 @@ export function LoginForm({ next }: { next?: string }) {
         {state.status === "error" && state.message && (
           <Alert tone="danger" title="Could not sign in">
             {state.message}
+            {state.unconfirmedEmail && (
+              <>
+                {" "}
+                <Link
+                  href={`/verify-email?email=${encodeURIComponent(state.unconfirmedEmail)}`}
+                  className="font-medium underline"
+                >
+                  Send a new confirmation link
+                </Link>
+              </>
+            )}
           </Alert>
         )}
 

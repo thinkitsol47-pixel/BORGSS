@@ -23,12 +23,11 @@ export const metadata: Metadata = { title: "Integrations" };
  */
 
 /**
- * `partial` exists because the mail provider is neither of the other two, and
- * calling it "Not connected" was a lie this page told for over a week: Resend
- * is wired, six templates are written and messages genuinely send — to exactly
- * one address, because the journal owns no domain. "Connected" would be the
- * worse lie of the two, since an editor would expect an author to be written
- * to. A third state is the only honest answer.
+ * `partial` exists for a service that works but does not yet do everything a
+ * reader would expect of it. The mail provider sat here for weeks because the
+ * journal owned no domain; since 2026-10-01 `borjss.online` is verified and
+ * mail reaches anyone, so it is now `connected` — with the messages that are
+ * still not *built* named in its consequence rather than implied by the badge.
  */
 type IntegrationState = "not-connected" | "partial" | "connected";
 
@@ -57,8 +56,8 @@ const INTEGRATIONS: {
     purpose:
       "Sign-in, registration, password reset and session handling for every portal route.",
     consequence:
-      "Connected. The middleware redirects every portal route to the login page without a session. Two things still wait on the mail provider below: email addresses are not verified on registration, and a reset link may not be delivered.",
-    state: "partial",
+      "Connected. The middleware redirects every portal route to the login page without a session. A new account cannot sign in until its email address is confirmed from the link it is sent, and password-reset links are delivered through the mail provider below.",
+    state: "connected",
   },
   {
     name: "File storage — Cloudinary",
@@ -82,8 +81,9 @@ const INTEGRATIONS: {
     purpose:
       "Sends every message the platform produces: decision letters, reviewer invitations, password resets, contact-form mail.",
     consequence:
-      "Resend is connected and six of the fifteen templates are written, but the journal owns no domain — so Resend accepts mail only to the account owner's own address and refuses everything else with a 403. In practice: an author who submits gets no receipt, an invited reviewer is never told, and a forgotten password cannot be recovered. Correspondence still goes out of the editorial office by hand. Buying a domain and verifying it at resend.com/domains is the whole fix; only EMAIL_FROM changes.",
-    state: "partial",
+      "Resend, sending from borjss.online (verified). Sent today: email-address confirmation, password reset, the submission receipt, and the receipts and office notifications for the contact form and reviewer applications. Not built yet, so still sent from the editorial office by hand: decision letters, reviewer invitations and reminders, and account invitations. Replies go to the editorial office's Gmail; the domain has no inbox.",
+    state: "connected",
+    seeAlso: { label: "Email templates", href: "/admin/settings/email-templates" },
   },
   {
     name: "ORCID",

@@ -43,7 +43,7 @@ export default async function Page({
   return (
     <PortalPage
       title="Contact messages"
-      lead="Enquiries sent through the public contact form. Reply from your own mailbox — mail to a sender is refused until the journal owns a domain."
+      lead="Enquiries sent through the public contact form. Each one is also emailed to the editorial office, and the sender gets an acknowledgement. Reply from your own mailbox — the portal has no reply box."
     >
       {/* No standing notice. The lead above already says replies go from your
           own mailbox and why, and repeating it in a box over an empty queue is

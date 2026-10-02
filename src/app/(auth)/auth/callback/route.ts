@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseServer } from "@/lib/auth/supabase";
 
 /**
- * Where every emailed auth link lands — password reset today, address
- * verification once phase 6 connects a mail provider.
+ * Where the emailed password-reset link lands. (Address verification uses
+ * `/auth/confirm` instead — a `token_hash`, not a `code`.)
  *
  * Supabase does not put a usable token in the link. It sends a one-time `code`
  * that has to be exchanged for a session, and the exchange has to happen on the

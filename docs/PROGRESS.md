@@ -82,23 +82,33 @@ that saves. The client's original order put production first so the issue
 screen would have something real to place; the seeded accepted manuscripts
 served that purpose, and the placement round was exercised against them.
 
-### 1. Buy a domain — the only thing blocking a launch, and not a code task
+### 1. ~~Buy a domain~~ — done; live at www.borjss.online (2026-09-30 → 10-02)
 
-Resend is connected and six templates are written, but **the journal owns no
-domain**, so Resend delivers only to the account owner's own address
-(`ceoborjss@gmail.com`) and refuses everything else with a 403. That means:
+**Where it runs now.** The repo moved to the owner's GitHub
+(`thinkitsol47-pixel/BORGSS`, public — Vercel Hobby blocks collaborator
+commits on private repos). Vercel project `borgss` on the owner's account,
+functions in **`hnd1` (Tokyo)** beside the database. The original Supabase
+project was lost with its account; a **new project `ohymquynkknuznxzdbue`
+(ap-northeast-1)** was migrated (all 10) and seeded (portal demo only), and
+`ceoborjss@gmail.com` recreated as superAdmin. Anything created through the
+old app — including `BORJSS-2026-0079`'s production progress in item 0 — is
+gone; item 0 restarts from the seeded state.
 
-- an author who submits gets no receipt
-- a reviewer who is invited is never told
-- a forgotten password cannot be recovered
+**Email.** `borjss.online` verified at Resend (Tokyo); app mail from
+`editorial@borjss.online`, Supabase auth mail (password reset) via custom
+SMTP from `no-reply@borjss.online`. The domain has no inbox — all replies and
+contact addresses are `ceoborjss@gmail.com` by the owner's decision.
+Registration now creates an unconfirmed account and emails a confirmation
+link (`generateLink` → `/verify-email?token_hash=` → POST `/auth/confirm`);
+"Send the link again" works, at most once a minute. Every "no domain" notice
+was re-read: the ones that still say a message is not sent now say why — it
+is not built (decision letters, reviewer invitations, production hand-offs,
+account invites).
 
-Buy one (`.org`, ~$12/year), verify it at resend.com/domains, set `EMAIL_FROM`
-to an address on it. **No code changes.** Then two things follow immediately:
-
-- set `email_confirm` back to `false` in `register` (`(auth)/actions.ts`) and
-  point `resendVerification` at `supabase.auth.resend()` — the TODO is there
-- open `/for-authors/how-to-submit` to the portal instead of email, which is
-  the one-line change described in the stale-notice sweep below
+**Still the owner's call, not a code task:** opening
+`/for-authors/how-to-submit` to the portal instead of email. The privacy
+policy says the portal is not yet open to authors because decisions are not
+emailed automatically; change both together.
 
 ### 2. ~~Galley uploads, proof corrections, revision uploads~~ — all done 2026-09-14
 

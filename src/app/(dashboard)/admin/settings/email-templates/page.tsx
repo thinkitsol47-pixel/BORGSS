@@ -54,29 +54,29 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Verify your email address",
         when: "An account is registered.",
         to: "The new account holder",
-        // `welcomeEmail` is written and registration sends it, but it welcomes
-        // rather than verifies — registration sets `email_confirm: true`
-        // because a confirmation link could not be delivered. The verification
-        // message itself is still unwritten, so this row stays unmarked and
-        // critical: without it, nobody's address is ever confirmed.
-        promisedBy: "Registration sends a welcome; nothing verifies an address",
+        // `verificationEmail`, sent by `register` and by "Send the link again".
+        // The account cannot sign in until the link is followed.
+        promisedBy: "Registration — sent with a confirmation link",
         href: "/register",
-        critical: true,
+        written: true,
       },
       {
         name: "Reset your password",
         when: "A password reset is requested.",
         to: "The account holder",
-        promisedBy: "Forgot-password screen",
+        // The one message not in templates.ts: Supabase sends it, through
+        // custom SMTP pointed at Resend (set in the Supabase dashboard). Its
+        // wording is edited there, under Authentication → Emails.
+        promisedBy: "Forgot-password screen — sent by Supabase through Resend",
         href: "/forgot-password",
-        critical: true,
+        written: true,
       },
       {
         name: "You have been invited",
         when: "An administrator creates an account for someone.",
         to: "The invited person",
         // `accountInviteEmail` exists in templates.ts but nothing calls it —
-        // creating an account is itself blocked on the domain. Written, not
+        // creating an account from the portal is not built. Written, not
         // sending; the template is ready for the day the screen is.
         promisedBy: "Users screen — an account sits at status “invited”",
         href: "/admin/users",
@@ -91,7 +91,7 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Submission received",
         when: "A manuscript is submitted through the wizard.",
         to: "The corresponding author",
-        promisedBy: "Wizard step 6 — sent, but not delivered without a domain",
+        promisedBy: "Wizard step 6 — sent on submission",
         href: "/submissions/new",
         written: true,
       },
@@ -210,12 +210,11 @@ export default async function Page() {
     <SettingsPage
       active="email-templates"
       title="Email templates"
-      lead="Every message this platform has promised to send, and which of them exist. Resend is connected, but with no domain it accepts mail only for the account owner's own address — so an author gets no receipt, an invited reviewer is never told, and a password reset cannot be delivered."
+      lead="Every message this platform has promised to send, and which of them exist. Mail is sent from borjss.online and reaches any address; the ones marked Not built are still sent by hand from the editorial office."
     >
-      {/* No standing box. Each row now carries its own Written / Not built
-          chip, which says the same thing per message and in the place the
-          reader is already looking; the SourceNote at the foot carries the
-          delivery limit. */}
+      {/* No standing box. Each row carries its own Written / Not built chip,
+          which says the same thing per message and in the place the reader
+          is already looking. */}
 
       {/* The ones with no workaround at all come next — the rest can at least
           be done by hand from the editorial office. */}
@@ -228,10 +227,9 @@ export default async function Page() {
             {critical.length} have no manual alternative
           </h2>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            A decision letter can be sent by hand from the editorial office. A
-            password reset cannot — nobody can act on these without a mail
-            provider, which is why they gate the launch rather than merely
-            slowing it.
+            A decision letter can be sent by hand from the editorial office.
+            These cannot be fully replaced that way: each starts a step inside
+            the portal that the person is never told about.
           </p>
           <ul className="mt-3 flex flex-wrap gap-2">
             {critical.map((t) => (
@@ -272,7 +270,7 @@ export default async function Page() {
                       {t.when}
                     </p>
                   </div>
-                  {/* Per row, not one label for all fifteen: seven of these
+                  {/* Per row, not one label for all fifteen: some of these
                       are written, and a blanket "Not built" made the screen
                       deny work that had already been done. */}
                   <span
@@ -351,13 +349,11 @@ export default async function Page() {
           should be. Changing wording is a one-line edit reviewed like any other.
         </p>
         <p className="mt-2">
-          Delivery is the real limit: with no verified domain, Resend accepts
-          mail only for the account owner&rsquo;s own address. Correspondence to
-          authors and reviewers still goes out by hand from{" "}
+          Mail is sent from borjss.online and replies come back to{" "}
           <span className="font-medium">
             {siteConfig.contact.editorialOffice}
           </span>
-          .{" "}
+          . Anything marked Not built still goes out by hand from that address.{" "}
           <Link
             href="/admin/integrations"
             className="font-medium text-primary hover:underline"

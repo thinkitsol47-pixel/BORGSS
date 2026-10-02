@@ -35,7 +35,7 @@ import type { ProductionStage, StageState } from "@/types";
  *
  * **No email is sent.** "Send to author" records that the stage went out and
  * when — which is what the queue ages the wait from — and says plainly that the
- * file still travels by hand until the journal owns a domain.
+ * file still travels by hand: mail works, but no production email is built.
  */
 
 const textareaClass =

@@ -210,8 +210,9 @@ function Submit() {
  * The result screen.
  *
  * The decision IS now recorded — the status has moved and the history has the
- * new entry. What has *not* happened is the letter reaching the author: there
- * is no mail provider, so that still goes out from the office by hand. The
+ * new entry. What has *not* happened is the letter reaching the author: mail
+ * works, but no decision-letter email has been built, so that still goes out
+ * from the office by hand. The
  * screen says exactly which of the two happened, and gives the letter back so
  * it can be copied into that email.
  */
@@ -245,8 +246,8 @@ function DecisionOutcome({
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
         <span className="font-medium text-foreground">The author has not been
         emailed.</span>{" "}
-        There is no mail provider yet, so the letter has to go out from the
-        editorial office by hand, quoting{" "}
+        The portal does not send decision letters yet, so this one has to go
+        out from the editorial office by hand, quoting{" "}
         <span className="font-medium text-foreground">{reference}</span>. It is
         repeated below to copy across. The reviewers are not notified
         automatically either.

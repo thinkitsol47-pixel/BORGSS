@@ -10,7 +10,6 @@ import { AuthResult } from "./auth-result";
 import {
   AuthHeading,
   PasswordField,
-  ScaffoldNotice,
   SubmitButton,
 } from "./auth-parts";
 

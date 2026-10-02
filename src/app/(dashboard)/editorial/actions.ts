@@ -20,10 +20,11 @@ import type { DecisionType } from "@/types";
  * pages call `requireGroup("editorial")`, but a Server Action is its own entry
  * point and can be invoked without the page ever loading.
  *
- * No email is sent from any of them. The decision letter, the reviewer
- * invitation and the "a decision was reached" notice all need a mail provider
- * (Phase 6); until then the screens say the message goes out from the office
- * by hand, and these actions only move the database.
+ * No email is sent from any of them. Mail works (since 2026-10-01), but the
+ * decision letter, the reviewer invitation and the "a decision was reached"
+ * notice have no templates or send calls yet; until they do, the screens say
+ * the message goes out from the office by hand, and these actions only move
+ * the database.
  */
 
 /** Prisma's enums are camelCase; `src/types` and the forms use kebab-case. */
@@ -237,7 +238,7 @@ export async function recordDecision(
     status: "success",
     decision,
     message:
-      "The decision is recorded and the manuscript's status has moved. No letter has been sent — that goes out from the editorial office by email until the mail provider is connected.",
+      "The decision is recorded and the manuscript's status has moved. No letter has been sent — the portal does not send decision letters yet, so it goes out from the editorial office by email.",
     values,
   };
 }

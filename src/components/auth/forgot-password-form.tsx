@@ -6,7 +6,7 @@ import { ArrowLeft, Mail, MailCheck, SendHorizonal } from "lucide-react";
 import { requestPasswordReset, type AuthState } from "@/app/(auth)/actions";
 import { Alert, Field, Input } from "@/components/ui";
 import { AuthResult } from "./auth-result";
-import { AuthHeading, ScaffoldNotice, SubmitButton } from "./auth-parts";
+import { AuthHeading, SubmitButton } from "./auth-parts";
 
 const initialState: AuthState = { status: "idle" };
 
@@ -41,12 +41,6 @@ export function ForgotPasswordForm() {
         Enter the address you registered with and we will send a link to set a
         new password.
       </AuthHeading>
-
-      <ScaffoldNotice title="A reset link may not arrive">
-        Password reset itself works, but email delivery is still being set up,
-        so a link may be delayed or may not reach you at all. If nothing comes
-        within a few minutes, contact the editorial office.
-      </ScaffoldNotice>
 
       <form action={formAction} className="space-y-5" noValidate>
         {state.status === "error" && state.message && (

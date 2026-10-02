@@ -12,7 +12,7 @@ export default async function Page() {
   return (
     <PortalPage
       title="Notifications"
-      lead="Which emails the journal sends you. Anything tied to a deadline starts switched on; anything promotional starts off. Your choices save, but none of them will reach you until the journal owns a domain — its mail provider currently refuses every address but its own."
+      lead="Which emails the journal sends you. Anything tied to a deadline starts switched on; anything promotional starts off. Your choices save, but the portal does not send these messages yet, so they decide nothing today."
     >
       <ProfileTabs active="notifications" />
 

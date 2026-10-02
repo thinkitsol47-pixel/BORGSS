@@ -99,8 +99,8 @@ export default async function Page({
               box is what gives them the address and the reference to quote. */}
           <Alert tone="info" title="To reply, email the editorial office">
             <p>
-              The portal records correspondence but cannot send it — the journal
-              owns no domain yet. Write to{" "}
+              The portal records correspondence but has no reply box of its own.
+              Write to{" "}
               <a
                 href={`mailto:${siteConfig.contact.editorialOffice}?subject=${encodeURIComponent(submission.reference)}`}
                 className="font-medium text-primary hover:text-brand-dark hover:underline"

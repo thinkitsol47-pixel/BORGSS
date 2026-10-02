@@ -24,8 +24,8 @@ import type { ProductionStage, StageState } from "@/types";
  * reasoning as `recordDecision` in editorial.
  *
  * **No email is sent from any of them.** "Send to author" records that the
- * stage went out and when; the file itself still travels by email until the
- * journal owns a domain. The screens say so, and `sentToAuthorAt` is what the
+ * stage went out and when; the file itself still travels by hand from the
+ * office, because no production email is built. The screens say so, and `sentToAuthorAt` is what the
  * queue ages the wait from — so the record is useful even while the message is
  * manual.
  */

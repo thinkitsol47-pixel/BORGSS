@@ -44,7 +44,7 @@ export default async function Page({
   return (
     <PortalPage
       title="Reviewer applications"
-      lead="People who applied through the public form. A decision sets the application's status — it does not create an account, because the invitation would have to be emailed and the journal owns no domain. Contact the applicant from your own mailbox, then add them to the reviewer pool once they have an account."
+      lead="People who applied through the public form. A decision sets the application's status — it does not create an account or email the applicant; neither is built yet. Contact the applicant from your own mailbox, ask them to register, then add them to the reviewer pool once they have an account."
     >
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Pending" value={stats.pending} tone="warning" />

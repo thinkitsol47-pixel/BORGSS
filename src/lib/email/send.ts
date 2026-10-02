@@ -15,16 +15,15 @@ import { Resend } from "resend";
  * more than the notification, and the office can resend by hand. So every
  * function returns a result, and callers decide what to say on screen.
  *
- * ## The delivery limit, as of 2026-09-09
+ * ## Delivery, as of 2026-10-01
  *
- * **No domain is verified**, so Resend will only deliver to the account
- * owner's own address, and only from `onboarding@resend.dev`. Mail addressed
- * to an author or a reviewer is accepted by this module and refused by Resend.
- * `canReachRecipients()` is how a screen finds that out without guessing, and
- * why no page has been changed to promise that a message was sent.
- *
- * Verify the journal's domain at resend.com/domains and set `EMAIL_FROM` to an
- * address on it. That is the whole of the change — no code here moves.
+ * `borjss.online` is verified at Resend and `EMAIL_FROM` is
+ * `BORJSS <editorial@borjss.online>`, so mail reaches any address. The domain
+ * has **no inbox**: every message sets `replyTo` to the editorial office's
+ * Gmail (`site.config.ts`), and nothing should invite a reply to the sending
+ * address. If `EMAIL_FROM` is ever unset, the fallback below is Resend's
+ * sandbox sender, which delivers only to the Resend account owner —
+ * `canReachRecipients()` reports exactly that case.
  */
 
 export type SendResult =

@@ -10,9 +10,9 @@ forms, the editorial decision and reviewer assignment, the reviewer's report,
 profile settings, and the announcements CRUD all persist. **Authentication is
 real** — Supabase Auth, with the middleware closing every portal route to
 anyone without a session, and Row Level Security on across all 34 tables.
-Email is connected through Resend but **can only reach one address until the
-journal buys a domain**, which is why addresses go unverified and a
-password-reset link may not be delivered. File storage works for submissions: an author
+**Email works** (since 2026-10-01): `borjss.online` is verified at Resend, a new
+account must confirm its address before it can sign in, and password reset is
+delivered. File storage works for submissions: an author
 can complete the wizard and the manuscript is uploaded, stored confidentially
 and downloadable by the people entitled to it. **Production galleys upload and
 download the same way**, every production stage transition and proof correction
@@ -24,8 +24,8 @@ that editors are offered from — two links that had no code behind them until
 2026-09-16. **Issue planning landed the same day**, which was the last unbuilt
 feature and the last one that was purely code: an editor can open an issue,
 place accepted manuscripts into it, set their running order and take them out
-again. What is left is only what money buys: a domain (which unblocks all
-email), a Crossref prefix, an ISSN and an e-ISSN.
+again. What is left that money buys: a Crossref prefix, an ISSN and an
+e-ISSN. (The domain, `borjss.online`, was bought and is live.)
 `docs/PROGRESS.md` under "Backend progress" is the live record of what has
 landed; `src/lib/api/mock-*.ts` now feeds `prisma/seed.ts` rather than the app.
 
@@ -293,15 +293,21 @@ The only `alert()` left is on `/admin/doi`, and both its buttons are
 **disabled** with the reason on the button itself. It is unreachable until a
 Crossref prefix exists, so it promises nothing.
 
-- **Email sends, but only to one address.** Resend is connected and six of the
-  fifteen templates are written. **The journal owns no domain**, so Resend
-  delivers only to the Resend account owner's own address and only from
-  `onboarding@resend.dev` — mail to an author or reviewer is refused with a
-  403. Buying a domain and verifying it at resend.com/domains is the whole fix;
-  only `EMAIL_FROM` changes. Until then `canReachRecipients()` is false and no
-  screen may promise a recipient that a message was sent to them.
-  `/admin/messages` and `/admin/reviewer-applications` remain the queues the
-  office actually works; `/admin/settings/email-templates` lists all 15.
+- **Email reaches anyone; most correspondence is still not built** (settled
+  2026-10-01). `borjss.online` is verified at Resend and `EMAIL_FROM` is
+  `BORJSS <editorial@borjss.online>`. **The domain has no inbox** — every
+  message's `replyTo`, and every contact address in `site.config.ts`, is the
+  owner's Gmail `ceoborjss@gmail.com`, by the owner's decision. Never point a
+  contact address at the domain without a real mailbox behind it.
+  *Sent:* address confirmation, the submission receipt, contact-form and
+  reviewer-application receipts plus office notifications, and password reset
+  — the last one by **Supabase**, through custom SMTP to Resend
+  (`no-reply@borjss.online`), configured in the Supabase dashboard, not here.
+  *Not built, still sent by hand:* decision letters, reviewer invitations and
+  reminders, production hand-offs, account invites (`accountInviteEmail` has no
+  caller). Screens that say a message is not sent now give that reason — "not
+  built" — rather than the old "no domain". `/admin/settings/email-templates`
+  lists all 15.
 - Manuscript template files do not exist yet. The templates page says so
   honestly — leave it that way until the files are real.
 - ~~Proof corrections~~ and ~~revision uploads~~ — **both built 2026-09-14.**
@@ -335,17 +341,18 @@ Crossref prefix exists, so it promises nothing.
   inside `recordDecision`'s transaction, with all three stages `notStarted`.
   Before this, `productionJob.create` existed only in the seed and nothing ever
   entered production through the app.
-- **Auth works, but two flows still wait on email.** Sign-in, registration,
-  password reset and sign-out run on Supabase Auth, and `src/middleware.ts`
-  redirects every portal route to `/login` without a session. What is not
-  finished: **addresses are not verified** (registration sets
-  `email_confirm: true` because no mail provider is connected — set it back to
-  `false` when Resend lands) and **a reset link may not be delivered**, since
-  Supabase's built-in mailer is rate-limited and is not a delivery service.
-  Both say so on screen. **The demo door is gone** — no cookie, no one-click
-  entry, no environment bypass. One account can sign in
-  (`ceoborjss@gmail.com`, superAdmin); the other 39 `User` rows are seeded
-  profiles with no credentials.
+- **Auth works end to end** (2026-10-01). Sign-in, registration, password
+  reset and sign-out run on Supabase Auth, and `src/middleware.ts` redirects
+  every portal route to `/login` without a session (it verifies the token
+  locally with `getClaims()`; pages still call `getUser()`). **Registration
+  creates an unconfirmed account** via `generateLink` and emails our own link;
+  it opens `/verify-email?token_hash=…`, whose button POSTs to `/auth/confirm`
+  — never confirm on GET, mail scanners open links and would spend the
+  single-use token. **Sign-out is POST only** (`/logout`): a GET sign-out link
+  was prefetched by Next and ended sessions when the menu opened. **The demo
+  door is gone** — no cookie, no one-click entry, no environment bypass. One
+  account can sign in (`ceoborjss@gmail.com`, superAdmin); the other 39 `User`
+  rows are seeded profiles with no credentials.
 - **No Crossref prefix, no ISSN, no e-ISSN.** Every DOI in the app begins
   `10.xxxxx` and resolves nowhere. These three block a DOAJ application;
   `/admin/settings/journal` and `/admin/doi` both say so on screen.

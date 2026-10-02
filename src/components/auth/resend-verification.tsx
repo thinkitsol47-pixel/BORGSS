@@ -18,7 +18,7 @@ export function ResendVerification({ email }: { email: string }) {
         <div className="mb-4 text-left">
           <Alert
             tone={state.status === "success" ? "info" : "danger"}
-            title={state.status === "success" ? "Nothing sent yet" : "Could not resend"}
+            title={state.status === "success" ? "Link requested" : "Could not resend"}
           >
             {state.message}
           </Alert>

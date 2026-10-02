@@ -214,12 +214,12 @@ export default async function Page({
               <div className="mt-8">
                 {/* Kept: this sits directly above the submit, and an editor
                     who records a decision believing the author has been told
-                    is the mistake it prevents. "There is no mail provider yet"
-                    was wrong — there is one; it cannot reach the author. */}
+                    is the mistake it prevents. Mail works; what does not
+                    exist is a decision-letter email, so nothing is sent. */}
                 <Alert tone="info" title="The letter is still sent by hand">
                   Recording a decision does <strong>not</strong> email the author
-                  or the reviewers — the journal owns no domain, so nothing can
-                  reach them. Send the letter from the editorial office, quoting{" "}
+                  or the reviewers — the portal does not send decision letters
+                  yet. Send the letter from the editorial office, quoting{" "}
                   <span className="font-medium">{submission.reference}</span>.
                 </Alert>
               </div>

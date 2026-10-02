@@ -68,19 +68,19 @@ export default function Page() {
           no cookie of any kind.
         </li>
         <li>
-          <strong>The forms save, but do not yet notify anyone.</strong> The
+          <strong>The forms save and send an acknowledgement.</strong> The
           contact and reviewer-application forms record what you submit so the
-          editorial office can act on it, but no email is sent — to you or to
-          the office — because the mail provider has not been connected. If you
-          need a prompt reply, use the email addresses on the{" "}
-          <Link href="/contact">contact page</Link> as well.
+          editorial office can act on it, email you a short acknowledgement,
+          and notify the office. Replies come from the addresses on the{" "}
+          <Link href="/contact">contact page</Link>.
         </li>
         <li>
           <strong>Manuscripts are still sent by email.</strong> The portal is
           built and accounts, submissions and peer review all work inside it,
-          but it is not yet open to authors — email notification is not
-          connected, so nobody would be told what happened to their manuscript.
-          Until it opens, submissions reach the editorial office by email.
+          but it is not yet open to authors — editorial decisions are not yet
+          emailed automatically, so an author would not be told what happened
+          to their manuscript. Until it opens, submissions reach the editorial
+          office by email.
         </li>
       </ul>
       <p>
@@ -99,11 +99,11 @@ export default function Page() {
             ],
             [
               "Contact form",
-              "Your name, email address, subject and message. Stored for the editorial office to respond to; not forwarded anywhere else, and no email is sent yet.",
+              "Your name, email address, subject and message. Stored for the editorial office to respond to. An acknowledgement is emailed to you and a copy of the message to the editorial office; it is not forwarded anywhere else.",
             ],
             [
               "Reviewer application",
-              "Your name, email, affiliation, position, areas of expertise and any ORCID iD you supply. Stored as a pending application for an editor to review; not forwarded anywhere else.",
+              "Your name, email, affiliation, position, areas of expertise and any ORCID iD you supply. Stored as a pending application for an editor to review. An acknowledgement is emailed to you and a notification to the editorial office; it is not forwarded anywhere else.",
             ],
             [
               "Manuscript submission",
@@ -220,6 +220,11 @@ export default function Page() {
         <li>
           <strong>Hosting and infrastructure providers</strong>, which process
           data on the journal&rsquo;s instructions in order to run the site;
+        </li>
+        <li>
+          <strong>An email delivery provider</strong>, which receives your
+          address and the text of each message the journal sends you, solely to
+          deliver it;
         </li>
         <li>
           <strong>Crossref</strong>, which receives the metadata of published

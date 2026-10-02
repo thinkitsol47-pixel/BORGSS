@@ -163,14 +163,12 @@ export default async function Page({
               <Mail className="size-4" aria-hidden />
               Contacting the author
             </h2>
-            {/* "Messaging is not built yet" was only half the reason. The
-                portal has no reply box, but even with one nothing could be
-                sent: the journal owns no domain, so no mail can leave the
-                platform at all. Stating only the smaller reason made the
-                bigger one look solved. */}
+            {/* Mail itself works since 2026-10-01 (the domain is verified);
+                what is missing is a way to write to an author from inside the
+                portal. Say that, not "the portal cannot send mail". */}
             <p className="mt-2 text-sm leading-relaxed text-brand-darker">
-              The portal cannot send mail yet — the journal owns no domain — so
-              write to the corresponding author from your own mailbox, quoting{" "}
+              The portal has no messaging of its own yet, so write to the
+              corresponding author from your own mailbox, quoting{" "}
               <span className="font-medium">{submission.reference}</span>.
             </p>
             {correspondingEmail(submission) && (

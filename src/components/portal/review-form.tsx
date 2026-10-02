@@ -53,9 +53,9 @@ export function ReviewForm({
         </p>
         {/* Was "once the backend is connected, submitting marks the assignment
             complete, notifies the handling editor…" — written before any of it
-            worked. All of it now does except the notification, which needs
-            email the journal cannot send, so that half is stated as the gap it
-            is rather than left inside a promise about the future. */}
+            worked. All of it now does except the notification, which is not
+            built, so that half is stated as the gap it is rather than left
+            inside a promise about the future. */}
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
           Your report is saved and this assignment is marked complete. When
           every reviewer for the round is in, the manuscript moves to the
@@ -63,8 +63,9 @@ export function ReviewForm({
           until that decision is issued.
         </p>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          The handling editor is not emailed — the journal owns no domain yet —
-          so the report waits in their queue until they next open it.
+          The handling editor is not emailed — the portal does not send that
+          notification yet — so the report waits in their queue until they next
+          open it.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button href="/reviews" variant="outline">

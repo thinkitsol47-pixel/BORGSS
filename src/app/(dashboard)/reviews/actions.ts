@@ -10,9 +10,9 @@ import { reviewFormSchema, REVIEW_CRITERIA } from "@/lib/validation/schemas";
  * Review Server Actions.
  *
  * Phase 4: these write. No email from either — the handling editor is not
- * notified of an accept, a decline, or a returned report (that is Phase 6) —
- * so the screens say the editor is told by the office in the meantime and
- * these actions only move the database.
+ * notified of an accept, a decline, or a returned report; mail works, but
+ * those notifications are not built — so the screens say the editor is told
+ * by the office in the meantime and these actions only move the database.
  *
  * Every one loads the assignment and checks it belongs to the signed-in
  * reviewer. A Server Action is its own entry point; the page's `requireUser`

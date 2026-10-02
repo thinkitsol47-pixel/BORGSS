@@ -59,7 +59,7 @@ export async function saveProfile(
 
   // The email address is the login and the address every decision letter goes
   // to. Changing it has to be confirmed from the new address before it takes
-  // effect, and there is no mail provider to send that confirmation with — so
+  // effect, and that confirmation step is not built (mail itself works) — so
   // the change is refused rather than applied silently. Refusing is the safe
   // failure here: applying it could lock someone out of their own account.
   const emailChanged = d.email.toLowerCase() !== user.email.toLowerCase();
@@ -89,7 +89,7 @@ export async function saveProfile(
   return {
     status: "success",
     message: emailChanged
-      ? "Your details are saved — except the email address. Changing it has to be confirmed from the new address first, and the portal cannot send that confirmation yet. Ask the editorial office to change it for you."
+      ? "Your details are saved — except the email address. Changing it has to be confirmed from the new address first, and the portal does not offer that step yet. Ask the editorial office to change it for you."
       : "Your details are saved.",
     values: raw,
   };
@@ -181,11 +181,13 @@ export async function saveNotifications(
 
   return {
     status: "success",
-    // No email is sent at all yet, so these settings decide nothing today.
-    // Saying that is better than letting someone believe they have just
-    // silenced mail they were never going to receive.
+    // Mail works, but none of the messages these switches govern (status
+    // updates, invitations, reminders, issue and news mail) is sent yet — only
+    // transactional mail is, and that ignores preferences by design. So these
+    // decide nothing today, and saying so beats letting someone believe they
+    // have just silenced mail they were never going to receive.
     message:
-      "Your preferences are saved. No email is sent from the portal yet, so nothing changes until the mail provider is connected — and the messages listed as always sent will arrive regardless.",
+      "Your preferences are saved. The portal does not send the messages these govern yet, so nothing changes today — and the messages listed as always sent will arrive regardless.",
     values: raw,
   };
 }

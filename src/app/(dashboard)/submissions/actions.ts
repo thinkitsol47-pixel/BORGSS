@@ -795,9 +795,8 @@ export async function submitSubmission(
 
   // After the transaction, and never allowed to fail it: a manuscript that
   // reached the editor has been submitted whether or not the receipt was
-  // delivered. With no verified mail domain this send is refused anyway, which
-  // is why the redirect target — the author's own detail page — is what
-  // actually confirms the submission.
+  // delivered. The redirect target — the author's own detail page — is what
+  // confirms the submission; the receipt is a courtesy on top.
   const user = await getCurrentUser();
   if (user) {
     await sendEmail(
