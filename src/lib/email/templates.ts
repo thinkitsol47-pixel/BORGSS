@@ -134,11 +134,11 @@ export function submissionReceiptEmail(params: {
  * The decision letter, sent to the corresponding author when an editor records
  * a decision.
  *
- * **Only the letter the editor wrote for the author.** The internal note, the
- * reviewers' identities and their confidential comments to the editor never
- * enter this function — it is not given them, so it cannot leak them. The
- * letter is the editor's own text and is sent exactly as recorded, which is
- * also what the author's decision page in the portal shows.
+ * **The letter, and optionally the reviewers' comments to the author.** The
+ * internal note, the reviewers' identities and their confidential comments to
+ * the editor never enter this function — it is not given them, so it cannot
+ * leak them. The letter is sent exactly as recorded, which is also what the
+ * author's decision page in the portal shows.
  *
  * The opening names the decision in plain words, so an author scanning an
  * inbox knows before reading the letter; a revision carries its due date.
@@ -151,9 +151,23 @@ export function decisionLetterEmail(params: {
   decisionLabel: string;
   /** The letter as stored: one string per paragraph. */
   letter: string[];
+  /**
+   * Reviewers' comments to the author, when the editor chose to include them.
+   * Labelled ("Reviewer 2"), never named. Comments to the editor are not a
+   * field here, so they cannot be passed in.
+   */
+  reports?: { label: string; comments: string[] }[];
   revisionDueAt?: Date | null;
   portalUrl: string;
 }): EmailMessage {
+  const reports =
+    params.reports && params.reports.length > 0
+      ? `\n\n—\n\nReviewers' comments\n\n` +
+        params.reports
+          .map((r) => `${r.label}:\n\n${r.comments.join("\n\n")}`)
+          .join("\n\n")
+      : "";
+
   const due = params.revisionDueAt
     ? `\n\nPlease return your revised manuscript by ${params.revisionDueAt.toLocaleDateString(
         "en-GB",
@@ -172,9 +186,84 @@ export function decisionLetterEmail(params: {
       `The editor's letter follows.\n\n` +
       `—\n\n` +
       params.letter.join("\n\n") +
+      reports +
       `\n\n—\n\n` +
-      `You can also read this decision in the portal:\n${params.portalUrl}\n\n` +
+      `You can also read the editor's letter in the portal:\n${params.portalUrl}\n\n` +
       `Please quote ${params.reference} in any reply.` +
+      signOff(),
+  };
+}
+
+/**
+ * The invitation to review, sent when an editor records one.
+ *
+ * **Double-blind by construction:** the function takes the title and abstract
+ * and nothing else about the manuscript — no contributors, affiliations or
+ * files — so it cannot name the authors even by mistake.
+ */
+export function reviewInvitationEmail(params: {
+  to: string;
+  name: string;
+  reference: string;
+  title: string;
+  abstract: string;
+  dueAt?: Date | null;
+  note?: string | null;
+  portalUrl: string;
+}): EmailMessage {
+  const due = params.dueAt
+    ? `\nThe review would be due by ${params.dueAt.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })}.\n`
+    : "";
+  const note = params.note ? `\nA note from the editor:\n${params.note}\n` : "";
+
+  return {
+    to: params.to,
+    replyTo: EDITORIAL_OFFICE,
+    subject: `${params.reference} — invitation to review for ${journalName()}`,
+    text:
+      `Dear ${params.name},\n\n` +
+      `You are invited to review a manuscript for ${journalName()}. ` +
+      `Review is double-blind: you will not see the authors' names, and they will not see yours.\n\n` +
+      `Title: ${params.title}\n\n` +
+      `Abstract:\n${params.abstract}\n` +
+      due +
+      note +
+      `\nPlease accept or decline in the portal:\n${params.portalUrl}\n\n` +
+      `Please quote ${params.reference} in any reply.` +
+      signOff(),
+  };
+}
+
+/**
+ * Tells the editorial office that a reviewer accepted, declined or returned a
+ * report. Names the reviewer by label ("Reviewer 2"), as the portal does.
+ */
+export function reviewUpdateOfficeEmail(params: {
+  to: string;
+  reference: string;
+  label: string;
+  event: "accepted" | "declined" | "report";
+  reason?: string | null;
+  portalUrl: string;
+}): EmailMessage {
+  const what =
+    params.event === "accepted"
+      ? "accepted the invitation"
+      : params.event === "declined"
+        ? "declined the invitation"
+        : "returned their report";
+  const reason = params.reason ? `\n\nReason given:\n${params.reason}` : "";
+
+  return {
+    to: params.to,
+    subject: `${params.reference} — ${params.label} ${what}`,
+    text:
+      `${params.label} has ${what} for ${params.reference}.${reason}\n\n` +
+      `Open the manuscript:\n${params.portalUrl}` +
       signOff(),
   };
 }

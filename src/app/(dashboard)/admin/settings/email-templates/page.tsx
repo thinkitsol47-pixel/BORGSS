@@ -127,8 +127,19 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Invitation to review",
         when: "An editor invites a reviewer.",
         to: "The invited reviewer",
-        promisedBy: "Reviewer assignment screen",
-        critical: true,
+        // `reviewInvitationEmail` — title and abstract only, never the authors.
+        promisedBy: "Reviewer assignment screen — sent when the invitation is recorded",
+        written: true,
+      },
+      {
+        name: "A reviewer responded",
+        when: "A reviewer accepts or declines an invitation, or returns a report.",
+        to: "The editorial office",
+        // `reviewUpdateOfficeEmail`. To the office rather than a named editor:
+        // there is no handling-editor column to address it to.
+        promisedBy: "Reviewer’s invitation and report screens",
+        href: "/reviews",
+        written: true,
       },
       {
         name: "Review reminder",

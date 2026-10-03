@@ -152,9 +152,9 @@ export default async function Page({
             is visible from the buttons. */}
         <Alert tone="warning" title="Before you invite">
           <p>
-            No email is sent — the invitation appears in the reviewer&rsquo;s own
-            queue, so write to them yourself quoting{" "}
-            <span className="font-medium">{submission.reference}</span>.
+            Recording an invitation emails it to the reviewer straight away —
+            the title, the abstract, the due date and your note, never the
+            authors&rsquo; names. Write the note as you would want it read.
           </p>
           <p className="mt-2">
             Only a shared affiliation is checked for conflicts. Check

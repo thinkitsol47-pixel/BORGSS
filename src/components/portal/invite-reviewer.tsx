@@ -18,9 +18,9 @@ const initial: AssignmentState = { ok: false };
  *
  * The invitation opens a panel rather than firing on click — it carries a due
  * date and a note in the editor's own words, and a reviewer decides partly on
- * why they were asked. **No email is sent**: the invitation itself still goes
- * out from the office by hand. What this records is that the reviewer was
- * approached, so the reviewers page and the decision screen stay honest.
+ * why they were asked. Recording it emails the invitation (title, abstract,
+ * due date, note — never the authors), and the success line says whether the
+ * email actually went.
  */
 
 /** Six weeks out, the journal's usual review window. */
@@ -58,10 +58,14 @@ export function InviteReviewerButton({
   }
 
   if (state.ok) {
-    return (
+    return state.emailed ? (
       <span className="text-xs font-medium text-success">
-        Invitation recorded — send it to {reviewerName} by email, quoting{" "}
-        {reference}.
+        Invitation recorded and emailed to {reviewerName}.
+      </span>
+    ) : (
+      <span className="text-xs font-medium text-danger">
+        Invitation recorded, but the email could not be sent — write to{" "}
+        {reviewerName} by hand, quoting {reference}.
       </span>
     );
   }
@@ -133,7 +137,7 @@ export function InviteReviewerButton({
             Record invitation
           </SubmitButton>
           <span className="text-xs text-muted-foreground">
-            No email is sent — send it by hand
+            The reviewer is emailed an invitation
           </span>
         </div>
       </form>
@@ -142,9 +146,8 @@ export function InviteReviewerButton({
 }
 
 /**
- * Withdraw an existing assignment. A reminder is a pure email action and has
- * no database step, so it stays a note rather than a button until the mail
- * provider lands.
+ * Withdraw an existing assignment. A reminder is a pure email action with no
+ * template yet, so it stays a note rather than a button until one is built.
  */
 export function AssignmentActions({
   assignmentId,

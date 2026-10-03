@@ -5,14 +5,17 @@ import { db, isUuid } from "@/lib/db";
 import { requireUser } from "@/lib/auth/require-role";
 import { recordAudit } from "@/lib/api/audit";
 import { reviewFormSchema, REVIEW_CRITERIA } from "@/lib/validation/schemas";
+import { sendEmail } from "@/lib/email/send";
+import { reviewUpdateOfficeEmail } from "@/lib/email/templates";
+import { siteConfig } from "@/config/site.config";
 
 /**
  * Review Server Actions.
  *
- * Phase 4: these write. No email from either — the handling editor is not
- * notified of an accept, a decline, or a returned report; mail works, but
- * those notifications are not built — so the screens say the editor is told
- * by the office in the meantime and these actions only move the database.
+ * Phase 4: these write. Since 2026-10-03 each also emails the editorial office
+ * — an accept, a decline (with its reason) or a returned report — after the
+ * database write, never able to undo it. The office, not a named editor: the
+ * schema has no handling-editor column to address.
  *
  * Every one loads the assignment and checks it belongs to the signed-in
  * reviewer. A Server Action is its own entry point; the page's `requireUser`
@@ -128,12 +131,24 @@ export async function respondToInvitation(
   revalidatePath(`/reviews/${assignment.id}`);
   revalidatePath("/dashboard");
 
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  await sendEmail(
+    reviewUpdateOfficeEmail({
+      to: siteConfig.contact.editorialOffice,
+      reference: assignment.submission.reference,
+      label: assignment.label,
+      event: response === "accept" ? "accepted" : "declined",
+      reason: response === "decline" ? reason || null : null,
+      portalUrl: `${base}/editorial/${assignment.submission.id}/reviewers`,
+    }),
+  );
+
   return {
     status: "success",
     message:
       response === "accept"
-        ? "You have accepted. Open the manuscript and start your report — the handling editor is told by the editorial office for now, not automatically."
-        : "You have declined and the editorial office will be told. Thank you for responding quickly.",
+        ? "You have accepted, and the editorial office has been told. Open the manuscript and start your report."
+        : "You have declined, and the editorial office has been told. Thank you for responding quickly.",
     values: { response, reason },
   };
 }
@@ -301,6 +316,17 @@ export async function submitReview(
   revalidatePath(`/editorial/${assignment.submission.id}`);
   revalidatePath(`/editorial/${assignment.submission.id}/decision`);
   revalidatePath("/dashboard");
+
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  await sendEmail(
+    reviewUpdateOfficeEmail({
+      to: siteConfig.contact.editorialOffice,
+      reference: assignment.submission.reference,
+      label: assignment.label,
+      event: "report",
+      portalUrl: `${base}/editorial/${assignment.submission.id}`,
+    }),
+  );
 
   return {
     status: "success",

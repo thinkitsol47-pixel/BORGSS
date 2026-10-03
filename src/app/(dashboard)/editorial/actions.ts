@@ -12,7 +12,10 @@ import {
 } from "@/lib/api/editorial";
 import { decisionSchema, DECISION_TYPES } from "@/lib/validation/schemas";
 import { sendEmail } from "@/lib/email/send";
-import { decisionLetterEmail } from "@/lib/email/templates";
+import {
+  decisionLetterEmail,
+  reviewInvitationEmail,
+} from "@/lib/email/templates";
 import type { DecisionType } from "@/types";
 
 /**
@@ -23,9 +26,9 @@ import type { DecisionType } from "@/types";
  * point and can be invoked without the page ever loading.
  *
  * **Email.** `recordDecision` sends the decision letter to the corresponding
- * author (since 2026-10-02). Nothing else here sends yet: the reviewer
- * invitation and the "a decision was reached" notice to reviewers have no
- * templates, so the screens say those go out from the office by hand.
+ * author (2026-10-02); `inviteReviewer` sends the invitation to the reviewer
+ * (2026-10-03). The "a decision was reached" notice to reviewers and review
+ * reminders are not built, so the screens say those go out by hand.
  */
 
 /** Prisma's enums are camelCase; `src/types` and the forms use kebab-case. */
@@ -248,6 +251,7 @@ export async function recordDecision(
     decision,
     paragraphs: toParagraphs(parsed.data.letter),
     revisionDueAt,
+    includeReports: parsed.data.includeReports === "on",
   });
 
   return {
@@ -261,14 +265,23 @@ export async function recordDecision(
 
 /**
  * Emails the letter to the corresponding author — the contributor marked
- * corresponding, or the first listed if none is. Only the author-facing letter
- * is passed in; the internal note and reviewer identities never reach here.
+ * corresponding, or the first listed if none is. The internal note never
+ * reaches here.
+ *
+ * With "Send the reviewers' comments" ticked — the form's default — the
+ * reports of the round being decided go too, each under its label. The query
+ * selects `commentsToAuthor` and the label and **nothing else**: comments to
+ * the editor and raised concerns are confidential, and the reviewer's name is
+ * the one thing a double-blind journal must never put in this message. The
+ * checkbox existed long before this did and was silently ignored; it is
+ * honoured now because the letter is finally sent.
  */
 async function sendDecisionLetter(params: {
   submission: NonNullable<Awaited<ReturnType<typeof getEditorialSubmissionById>>>;
   decision: DecisionType;
   paragraphs: string[];
   revisionDueAt: Date | null;
+  includeReports: boolean;
 }): Promise<NonNullable<DecisionState["letter"]>> {
   const { submission } = params;
   const author =
@@ -276,6 +289,23 @@ async function sendDecisionLetter(params: {
     submission.contributors[0];
 
   if (!author?.email) return { outcome: "no-address" };
+
+  // `submission.round` was read before the transaction bumped it, so this is
+  // the round the decision is about.
+  const reports = params.includeReports
+    ? (
+        await db.reviewerReport.findMany({
+          where: { submissionId: submission.id, round: submission.round },
+          select: {
+            commentsToAuthor: true,
+            assignment: { select: { label: true } },
+          },
+          orderBy: { assignment: { label: "asc" } },
+        })
+      )
+        .filter((r) => r.commentsToAuthor.length > 0)
+        .map((r) => ({ label: r.assignment.label, comments: r.commentsToAuthor }))
+    : [];
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || "";
   const result = await sendEmail(
@@ -288,6 +318,7 @@ async function sendDecisionLetter(params: {
         DECISION_TYPES.find((d) => d.value === params.decision)?.label ??
         params.decision,
       letter: params.paragraphs,
+      reports,
       revisionDueAt: params.revisionDueAt,
       portalUrl: `${base}/submissions/${submission.id}/decision`,
     }),
@@ -300,15 +331,19 @@ async function sendDecisionLetter(params: {
  * Reviewer assignment.
  * ================================================================== */
 
-export type AssignmentState = { ok: boolean; error?: string };
+export type AssignmentState = {
+  ok: boolean;
+  error?: string;
+  /** Set on a successful invitation: whether the email was accepted for delivery. */
+  emailed?: boolean;
+};
 
 /**
  * Invite a reviewer to the manuscript's current round.
  *
- * No email — the invitation itself goes out from the office by hand. What this
- * records is that the reviewer was approached, with the due date and the
- * editor's note, so the reviewers page and the decision screen stay honest
- * about who is on the manuscript.
+ * Records that the reviewer was approached, with the due date and the editor's
+ * note, then emails the invitation. The row is written first and the mail
+ * cannot undo it: a failed send is reported so the office can write by hand.
  */
 export async function inviteReviewer(
   _prev: AssignmentState,
@@ -376,7 +411,7 @@ export async function inviteReviewer(
   });
   const label = `Reviewer ${existing + 1}`;
 
-  await db.reviewAssignment.create({
+  const created = await db.reviewAssignment.create({
     data: {
       submissionId: submission.id,
       reviewerId,
@@ -397,7 +432,22 @@ export async function inviteReviewer(
 
   revalidatePath(`/editorial/${submission.id}/reviewers`);
   revalidatePath(`/editorial/${submission.id}`);
-  return { ok: true };
+
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const mail = await sendEmail(
+    reviewInvitationEmail({
+      to: reviewer.email,
+      name: reviewer.name,
+      reference: submission.reference,
+      title: submission.title,
+      abstract: submission.abstract,
+      dueAt,
+      note: note || null,
+      portalUrl: `${base}/reviews/${created.id}`,
+    }),
+  );
+
+  return { ok: true, emailed: mail.ok };
 }
 
 /**

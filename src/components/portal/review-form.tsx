@@ -51,21 +51,19 @@ export function ReviewForm({
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
           {state.message}
         </p>
-        {/* Was "once the backend is connected, submitting marks the assignment
-            complete, notifies the handling editor…" — written before any of it
-            worked. All of it now does except the notification, which is not
-            built, so that half is stated as the gap it is rather than left
-            inside a promise about the future. */}
+        {/* The comments go out with the decision email when the editor leaves
+            "Send the reviewers' comments" ticked (the default) — under the
+            reviewer's label, never their name. Comments to the editor never
+            go. */}
         <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
           Your report is saved and this assignment is marked complete. When
           every reviewer for the round is in, the manuscript moves to the
-          editor&rsquo;s decision queue. Your comments to the author are held
-          until that decision is issued.
+          editor&rsquo;s decision queue. Your comments to the author are
+          normally emailed with the decision, under your reviewer number — never
+          your name.
         </p>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-          The handling editor is not emailed — the portal does not send that
-          notification yet — so the report waits in their queue until they next
-          open it.
+          The editorial office has been emailed that your report is in.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button href="/reviews" variant="outline">

@@ -218,9 +218,11 @@ export default async function Page({
                 <Alert tone="info" title="The letter is emailed to the author">
                   Recording a decision emails the letter above to the
                   corresponding author, exactly as written, quoting{" "}
-                  <span className="font-medium">{submission.reference}</span>.
-                  The internal note is never sent. The reviewers are{" "}
-                  <strong>not</strong> notified automatically.
+                  <span className="font-medium">{submission.reference}</span>
+                  {" "}— with the reviewers&rsquo; comments to the author if
+                  that box is ticked, under their reviewer numbers. The
+                  internal note and comments to the editor are never sent. The
+                  reviewers are <strong>not</strong> notified automatically.
                 </Alert>
               </div>
             </>

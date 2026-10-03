@@ -107,7 +107,15 @@ is not built (reviewer invitations, production hand-offs, account invites).
 **Decision letters are emailed** (2026-10-02). `recordDecision` sends
 `decisionLetterEmail` to the corresponding contributor after the transaction;
 the outcome screen reports sent / failed / no address and, unless sent, hands
-the letter back to copy. Next up: the reviewer invitation email.
+the letter back to copy.
+
+**Reviewer invitations are emailed** (2026-10-03). `inviteReviewer` sends
+`reviewInvitationEmail` (title, abstract, due date, note — no authors) with a
+link to `/reviews/<assignmentId>`; accept, decline and a returned report each
+email the office (`reviewUpdateOfficeEmail`). The decision form's long-ignored
+"Send the reviewers' comments" checkbox is now honoured in the decision email.
+Still by hand: review reminders, the outcome notice to reviewers, production
+hand-offs, account invites.
 
 **The portal is the primary submission route** — `/for-authors/how-to-submit`
 and the author guidelines already said so, and the privacy policy, which
