@@ -9,6 +9,8 @@ import {
   availableDecisions,
   decisionBlockedReason,
   getEditorialSubmissionById,
+  inviteClosedReason,
+  isAuthorOf,
 } from "@/lib/api/editorial";
 import { decisionSchema, DECISION_TYPES } from "@/lib/validation/schemas";
 import { sendEmail } from "@/lib/email/send";
@@ -90,7 +92,11 @@ const DECISION_EFFECT: Record<
     revisionDue: true,
   },
   reject: { status: "rejected", nextRound: false, revisionDue: false },
-  "desk-reject": { status: "deskRejected", nextRound: false, revisionDue: false },
+  "desk-reject": {
+    status: "deskRejected",
+    nextRound: false,
+    revisionDue: false,
+  },
 };
 
 /** The journal's default revision window. */
@@ -142,7 +148,8 @@ export async function recordDecision(
   if (!availableDecisions(submission).includes(decision)) {
     return {
       status: "error",
-      message: "That decision is not available for this manuscript at its current stage.",
+      message:
+        "That decision is not available for this manuscript at its current stage.",
       values,
     };
   }
@@ -231,7 +238,11 @@ export async function recordDecision(
     action: "decision.recorded",
     targetType: "submission",
     targetId: submission.id,
-    detail: { reference: submission.reference, decision, round: submission.round },
+    detail: {
+      reference: submission.reference,
+      decision,
+      round: submission.round,
+    },
   });
 
   revalidatePath("/editorial/queue");
@@ -277,7 +288,9 @@ export async function recordDecision(
  * honoured now because the letter is finally sent.
  */
 async function sendDecisionLetter(params: {
-  submission: NonNullable<Awaited<ReturnType<typeof getEditorialSubmissionById>>>;
+  submission: NonNullable<
+    Awaited<ReturnType<typeof getEditorialSubmissionById>>
+  >;
   decision: DecisionType;
   paragraphs: string[];
   revisionDueAt: Date | null;
@@ -304,7 +317,10 @@ async function sendDecisionLetter(params: {
         })
       )
         .filter((r) => r.commentsToAuthor.length > 0)
-        .map((r) => ({ label: r.assignment.label, comments: r.commentsToAuthor }))
+        .map((r) => ({
+          label: r.assignment.label,
+          comments: r.commentsToAuthor,
+        }))
     : [];
 
   const base = process.env.NEXT_PUBLIC_SITE_URL || "";
@@ -357,15 +373,34 @@ export async function inviteReviewer(
   const note = String(formData.get("note") ?? "").trim();
 
   const submission = await getEditorialSubmissionById(submissionId);
-  if (!submission) return { ok: false, error: "That manuscript could not be found." };
+  if (!submission)
+    return { ok: false, error: "That manuscript could not be found." };
 
-  if (!isUuid(reviewerId)) return { ok: false, error: "Choose a reviewer to invite." };
+  if (!isUuid(reviewerId))
+    return { ok: false, error: "Choose a reviewer to invite." };
   const reviewer = await db.user.findUnique({
     where: { id: reviewerId },
     include: { roles: true },
   });
   if (!reviewer || !reviewer.roles.some((r) => r.role === "reviewer")) {
     return { ok: false, error: "That person is not in the reviewer pool." };
+  }
+
+  // A decided manuscript has nothing left to review. Found in live testing
+  // (2026-10-03): Invite was still offered, recorded and emailed on a
+  // desk-rejected manuscript.
+  const closed = inviteClosedReason(submission.status);
+  if (closed) return { ok: false, error: closed };
+
+  // Never the manuscript's own author. Found the same day: the account that
+  // submitted a manuscript was invited to review it, because the only conflict
+  // checked was a shared affiliation.
+  if (isAuthorOf(submission, reviewer)) {
+    return {
+      ok: false,
+      error:
+        "That reviewer is an author of this manuscript and cannot review it.",
+    };
   }
 
   // No double invitation in the same round. An earlier round, or a withdrawn
@@ -380,7 +415,10 @@ export async function inviteReviewer(
     select: { id: true },
   });
   if (clash) {
-    return { ok: false, error: "That reviewer is already assigned for this round." };
+    return {
+      ok: false,
+      error: "That reviewer is already assigned for this round.",
+    };
   }
 
   // Shared affiliation is the one conflict this can check — same limit the
@@ -470,7 +508,10 @@ export async function withdrawAssignment(
 
   const assignment = await db.reviewAssignment.findUnique({
     where: { id: assignmentId },
-    include: { submission: { select: { id: true, reference: true } }, report: { select: { id: true } } },
+    include: {
+      submission: { select: { id: true, reference: true } },
+      report: { select: { id: true } },
+    },
   });
   if (!assignment) {
     return { ok: false, error: "That assignment could not be found." };
@@ -478,7 +519,8 @@ export async function withdrawAssignment(
   if (assignment.report) {
     return {
       ok: false,
-      error: "That reviewer has already returned a report, which stays on the record.",
+      error:
+        "That reviewer has already returned a report, which stays on the record.",
     };
   }
   if (assignment.status === "withdrawn") {
@@ -494,7 +536,10 @@ export async function withdrawAssignment(
     action: "review.withdrawn",
     targetType: "submission",
     targetId: assignment.submission.id,
-    detail: { reference: assignment.submission.reference, label: assignment.label },
+    detail: {
+      reference: assignment.submission.reference,
+      label: assignment.label,
+    },
   });
 
   revalidatePath(`/editorial/${assignment.submission.id}/reviewers`);

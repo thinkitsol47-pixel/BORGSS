@@ -6,6 +6,7 @@ import { requireGroup } from "@/lib/auth/require-role";
 import {
   getEditorialSubmissionById,
   getReviewerMatches,
+  inviteClosedReason,
   roundProgress,
   waitingOn,
   type ReviewerMatch,
@@ -32,7 +33,11 @@ export default async function Page({
   const submission = await getEditorialSubmissionById(params.submissionId);
   if (!submission) notFound();
 
-  const matches = await getReviewerMatches(submission);
+  // A decided manuscript gets no suggestions and no Invite buttons, and says
+  // why in place of them. The action refuses too; this keeps the screen from
+  // offering a control that would only fail.
+  const closed = inviteClosedReason(submission.status);
+  const matches = closed ? [] : await getReviewerMatches(submission);
   const { completed, total, overdue } = roundProgress(submission);
 
   const thisRound = submission.reviewAssignments.filter(
@@ -116,51 +121,60 @@ export default async function Page({
           </section>
         )}
 
-        <section aria-labelledby="suggestions-heading">
-          <h2
-            id="suggestions-heading"
-            className="font-serif text-lg font-semibold"
-          >
-            Suggested reviewers
-          </h2>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-            Ordered by how many of the manuscript&rsquo;s keywords each reviewer
-            covers, then by how much work they already hold. The matched
-            keywords are shown so you can judge the suggestion rather than
-            trust it.
-          </p>
+        {closed ? (
+          <Alert tone="info" title="No further reviewers">
+            {closed}
+          </Alert>
+        ) : (
+          <>
+            <section aria-labelledby="suggestions-heading">
+              <h2
+                id="suggestions-heading"
+                className="font-serif text-lg font-semibold"
+              >
+                Suggested reviewers
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                Ordered by how many of the manuscript&rsquo;s keywords each
+                reviewer covers, then by how much work they already hold. The
+                matched keywords are shown so you can judge the suggestion
+                rather than trust it.
+              </p>
 
-          <ul className="mt-4 space-y-3">
-            {matches.map((m) => (
-              <li key={m.reviewer.id}>
-                <MatchCard match={m} submission={submission} />
-              </li>
-            ))}
-          </ul>
+              <ul className="mt-4 space-y-3">
+                {matches.map((m) => (
+                  <li key={m.reviewer.id}>
+                    <MatchCard match={m} submission={submission} />
+                  </li>
+                ))}
+              </ul>
 
-          <p className="mt-4 text-sm text-muted-foreground">
-            <Link
-              href="/editorial/reviewers-db"
-              className="font-medium text-primary hover:text-brand-dark hover:underline"
-            >
-              Browse the full reviewer database
-            </Link>
-          </p>
-        </section>
+              <p className="mt-4 text-sm text-muted-foreground">
+                <Link
+                  href="/editorial/reviewers-db"
+                  className="font-medium text-primary hover:text-brand-dark hover:underline"
+                >
+                  Browse the full reviewer database
+                </Link>
+              </p>
+            </section>
 
-        {/* Kept: two things an editor must know *before* inviting, and neither
+            {/* Kept: two things an editor must know *before* inviting, and neither
             is visible from the buttons. */}
-        <Alert tone="warning" title="Before you invite">
-          <p>
-            Recording an invitation emails it to the reviewer straight away —
-            the title, the abstract, the due date and your note, never the
-            authors&rsquo; names. Write the note as you would want it read.
-          </p>
-          <p className="mt-2">
-            Only a shared affiliation is checked for conflicts. Check
-            co-authorship and supervision yourself.
-          </p>
-        </Alert>
+            <Alert tone="warning" title="Before you invite">
+              <p>
+                Recording an invitation emails it to the reviewer straight away
+                — the title, the abstract, the due date and your note, never the
+                authors&rsquo; names. Write the note as you would want it read.
+              </p>
+              <p className="mt-2">
+                The portal refuses a manuscript&rsquo;s own authors and flags a
+                shared affiliation. Check co-authorship and supervision
+                yourself.
+              </p>
+            </Alert>
+          </>
+        )}
       </div>
     </div>
   );

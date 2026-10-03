@@ -190,7 +190,12 @@ export async function getEditorialSubmissionById(
  * sitting on. "Under review" with every report in means the editor is the
  * hold-up, and an editor scanning a status column alone would not see that.
  */
-export type WaitingOn = "editor" | "reviewers" | "author" | "production" | "none";
+export type WaitingOn =
+  | "editor"
+  | "reviewers"
+  | "author"
+  | "production"
+  | "none";
 
 export function waitingOn(s: Submission): WaitingOn {
   switch (s.status) {
@@ -242,10 +247,7 @@ export function roundProgress(s: Submission) {
 
 /** Whole days a manuscript has been waiting since it was last touched. */
 export function daysWaiting(s: Submission, now = new Date()): number {
-  return Math.max(
-    0,
-    Math.floor((+now - +new Date(s.updatedAt)) / 86_400_000),
-  );
+  return Math.max(0, Math.floor((+now - +new Date(s.updatedAt)) / 86_400_000));
 }
 
 /**
@@ -477,7 +479,12 @@ export async function listReviewers(query: ReviewerQuery = {}) {
   // by reviewer afterwards — the N+1 this file exists to avoid.
   const allAssignments = await db.reviewAssignment.findMany({
     where: { reviewerId: { in: rows.map((r) => r.userId) } },
-    select: { reviewerId: true, status: true, invitedAt: true, completedAt: true },
+    select: {
+      reviewerId: true,
+      status: true,
+      invitedAt: true,
+      completedAt: true,
+    },
   });
   const byReviewer = new Map<string, typeof allAssignments>();
   for (const a of allAssignments) {
@@ -557,7 +564,12 @@ async function getAllReviewerProfiles(): Promise<ReviewerProfile[]> {
   });
   const allAssignments = await db.reviewAssignment.findMany({
     where: { reviewerId: { in: rows.map((r) => r.userId) } },
-    select: { reviewerId: true, status: true, invitedAt: true, completedAt: true },
+    select: {
+      reviewerId: true,
+      status: true,
+      invitedAt: true,
+      completedAt: true,
+    },
   });
   const byReviewer = new Map<string, typeof allAssignments>();
   for (const a of allAssignments) {
@@ -617,7 +629,8 @@ export async function getReportsForSubmission(
 }
 
 // Narrow alias purely so the mapper above reads without a long inline type.
-type ReviewSubmissionBodyRecommendation = ReviewerReport["body"]["recommendation"];
+type ReviewSubmissionBodyRecommendation =
+  ReviewerReport["body"]["recommendation"];
 
 /**
  * What the editor knows before writing a letter.
@@ -709,6 +722,47 @@ export function decisionBlockedReason(s: Submission): string | null {
   }
 }
 
+/**
+ * Why no reviewer can be invited to this manuscript, or null if one can.
+ *
+ * Shared by the invite action (which enforces it) and the reviewers page
+ * (which hides the buttons and says why), so the two cannot disagree. A
+ * revision in progress is not closed: the next round may need reviewers.
+ */
+export function inviteClosedReason(
+  status: Submission["status"],
+): string | null {
+  switch (status) {
+    case "accepted":
+    case "in-production":
+    case "published":
+      return "This manuscript has already been accepted, so no reviewers can be invited.";
+    case "rejected":
+    case "desk-rejected":
+      return "This manuscript has already been declined, so no reviewers can be invited.";
+    case "withdrawn":
+      return "The author withdrew this manuscript, so no reviewers can be invited.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Whether an account is an author of the manuscript: the account that
+ * submitted it, or anyone whose address is on its contributor list. Such an
+ * account must never review it.
+ */
+export function isAuthorOf(
+  s: Pick<Submission, "submittedById" | "contributors">,
+  person: { id: string; email: string },
+): boolean {
+  const email = person.email.toLowerCase();
+  return (
+    person.id === s.submittedById ||
+    s.contributors.some((c) => c.email?.toLowerCase() === email)
+  );
+}
+
 /* ------------------------------------------------------------------ *
  * Issues in preparation.
  * ------------------------------------------------------------------ */
@@ -755,13 +809,15 @@ export async function listEditorialIssues(): Promise<EditorialIssue[]> {
     "in-production": 1,
     published: 2,
   };
-  return rows.map(toEditorialIssue).sort(
-    (a, b) =>
-      order[a.state] - order[b.state] ||
-      b.year - a.year ||
-      b.volume - a.volume ||
-      b.number - a.number,
-  );
+  return rows
+    .map(toEditorialIssue)
+    .sort(
+      (a, b) =>
+        order[a.state] - order[b.state] ||
+        b.year - a.year ||
+        b.volume - a.volume ||
+        b.number - a.number,
+    );
 }
 
 export async function getEditorialIssueById(
@@ -889,7 +945,9 @@ export async function hasCrossrefPrefix(): Promise<boolean> {
 
 /** Sections present in the reviewer pool, for the filter bar. */
 export async function getReviewerSections(): Promise<string[]> {
-  const rows = await db.reviewerProfile.findMany({ select: { sections: true } });
+  const rows = await db.reviewerProfile.findMany({
+    select: { sections: true },
+  });
   return [...new Set(rows.flatMap((r) => r.sections))].sort();
 }
 
@@ -955,7 +1013,12 @@ export async function getReviewerMatches(
     );
 
     let conflict: string | null = null;
-    if (sharedAffiliation) {
+    if (
+      isAuthorOf(submission, { id: reviewer.userId, email: reviewer.email })
+    ) {
+      // First, because it is absolute: no availability or note changes it.
+      conflict = "Is an author of this manuscript";
+    } else if (sharedAffiliation) {
       conflict = "Shares an affiliation with an author";
     } else if (reviewer.availability === "unavailable") {
       // Through `formatDate`, not interpolated raw: `unavailableUntil` is an
