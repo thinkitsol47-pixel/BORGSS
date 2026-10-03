@@ -210,11 +210,10 @@ function Submit() {
  * The result screen.
  *
  * The decision IS now recorded — the status has moved and the history has the
- * new entry. What has *not* happened is the letter reaching the author: mail
- * works, but no decision-letter email has been built, so that still goes out
- * from the office by hand. The
- * screen says exactly which of the two happened, and gives the letter back so
- * it can be copied into that email.
+ * new entry. The letter is emailed to the corresponding author, and the screen
+ * reports what actually happened to it (`state.letter`) rather than assuming:
+ * sent, failed, or no address on file. When it did not go, the letter is given
+ * back so it can be copied into an email by hand.
  */
 function DecisionOutcome({
   state,
@@ -226,6 +225,7 @@ function DecisionOutcome({
   const label =
     DECISION_TYPES.find((d) => d.value === state.decision)?.label ??
     state.decision;
+  const sent = state.letter?.outcome === "sent";
 
   return (
     <div className="rounded-xl border border-success/30 bg-success/5 p-6">
@@ -243,17 +243,35 @@ function DecisionOutcome({
         the manuscript&rsquo;s history and its status has moved. This cannot be
         edited — a later decision is a new entry, not a replacement.
       </p>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-        <span className="font-medium text-foreground">The author has not been
-        emailed.</span>{" "}
-        The portal does not send decision letters yet, so this one has to go
-        out from the editorial office by hand, quoting{" "}
-        <span className="font-medium text-foreground">{reference}</span>. It is
-        repeated below to copy across. The reviewers are not notified
-        automatically either.
-      </p>
+      {sent ? (
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">
+            The letter has been emailed
+          </span>{" "}
+          to the corresponding author at{" "}
+          <span className="break-all font-medium text-foreground">
+            {state.letter?.to}
+          </span>
+          . Replies come to the editorial office. The reviewers are not
+          notified automatically.
+        </p>
+      ) : (
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          <span className="font-medium text-foreground">
+            The author has not been emailed
+          </span>{" "}
+          —{" "}
+          {state.letter?.outcome === "no-address"
+            ? "no email address is recorded for the corresponding author"
+            : "the message could not be sent"}
+          . Send the letter from the editorial office by hand, quoting{" "}
+          <span className="font-medium text-foreground">{reference}</span>. It is
+          repeated below to copy across. The reviewers are not notified
+          automatically either.
+        </p>
+      )}
 
-      {state.values?.letter && (
+      {!sent && state.values?.letter && (
         <div className="mt-5">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             The letter, as recorded

@@ -70,12 +70,10 @@ export default async function Page({
           <EmptyState
             icon={Gavel}
             title="No decision yet"
-            // "You will also be emailed" would be a promise the platform does
-            // not keep: no decision-letter email is built, so the portal sends
-            // nothing when a decision is recorded. Saying it here is worse than
-            // saying nothing — an author would watch an inbox instead of this
-            // page. (The editorial office may still write to you by hand.)
-            description="Decision letters appear here as soon as the handling editor has reached one. Check this page — the portal does not email decisions automatically."
+            // The letter is emailed to the corresponding author when it is
+            // recorded (since 2026-10-02). "Corresponding author", not "you":
+            // the account holder may not be the corresponding contributor.
+            description="Decision letters appear here as soon as the handling editor has reached one, and are emailed to the corresponding author at the same time."
           />
         ) : (
           <>

@@ -10,7 +10,9 @@ import {
   decisionBlockedReason,
   getEditorialSubmissionById,
 } from "@/lib/api/editorial";
-import { decisionSchema } from "@/lib/validation/schemas";
+import { decisionSchema, DECISION_TYPES } from "@/lib/validation/schemas";
+import { sendEmail } from "@/lib/email/send";
+import { decisionLetterEmail } from "@/lib/email/templates";
 import type { DecisionType } from "@/types";
 
 /**
@@ -20,11 +22,10 @@ import type { DecisionType } from "@/types";
  * pages call `requireGroup("editorial")`, but a Server Action is its own entry
  * point and can be invoked without the page ever loading.
  *
- * No email is sent from any of them. Mail works (since 2026-10-01), but the
- * decision letter, the reviewer invitation and the "a decision was reached"
- * notice have no templates or send calls yet; until they do, the screens say
- * the message goes out from the office by hand, and these actions only move
- * the database.
+ * **Email.** `recordDecision` sends the decision letter to the corresponding
+ * author (since 2026-10-02). Nothing else here sends yet: the reviewer
+ * invitation and the "a decision was reached" notice to reviewers have no
+ * templates, so the screens say those go out from the office by hand.
  */
 
 /** Prisma's enums are camelCase; `src/types` and the forms use kebab-case. */
@@ -51,6 +52,11 @@ export type DecisionState = {
   values?: Record<string, string>;
   /** Echoed back so the outcome screen can name what was decided. */
   decision?: string;
+  /**
+   * What happened to the letter, so the outcome screen says exactly that
+   * rather than assuming. `sent` means the mail provider accepted it.
+   */
+  letter?: { outcome: "sent" | "failed" | "no-address"; to?: string };
 };
 
 function fieldErrors(error: {
@@ -234,13 +240,60 @@ export async function recordDecision(
   revalidatePath("/production");
   revalidatePath(`/editorial/${submission.id}/production`);
 
+  // After the transaction, and never allowed to undo it: the decision stands
+  // whether or not the mail goes. A failure is reported on the outcome screen
+  // so the office knows to send the letter by hand.
+  const letter = await sendDecisionLetter({
+    submission,
+    decision,
+    paragraphs: toParagraphs(parsed.data.letter),
+    revisionDueAt,
+  });
+
   return {
     status: "success",
     decision,
-    message:
-      "The decision is recorded and the manuscript's status has moved. No letter has been sent — the portal does not send decision letters yet, so it goes out from the editorial office by email.",
+    letter,
+    message: "The decision is recorded and the manuscript's status has moved.",
     values,
   };
+}
+
+/**
+ * Emails the letter to the corresponding author — the contributor marked
+ * corresponding, or the first listed if none is. Only the author-facing letter
+ * is passed in; the internal note and reviewer identities never reach here.
+ */
+async function sendDecisionLetter(params: {
+  submission: NonNullable<Awaited<ReturnType<typeof getEditorialSubmissionById>>>;
+  decision: DecisionType;
+  paragraphs: string[];
+  revisionDueAt: Date | null;
+}): Promise<NonNullable<DecisionState["letter"]>> {
+  const { submission } = params;
+  const author =
+    submission.contributors.find((c) => c.isCorresponding) ??
+    submission.contributors[0];
+
+  if (!author?.email) return { outcome: "no-address" };
+
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const result = await sendEmail(
+    decisionLetterEmail({
+      to: author.email,
+      name: `${author.givenName} ${author.familyName}`.trim(),
+      reference: submission.reference,
+      title: submission.title,
+      decisionLabel:
+        DECISION_TYPES.find((d) => d.value === params.decision)?.label ??
+        params.decision,
+      letter: params.paragraphs,
+      revisionDueAt: params.revisionDueAt,
+      portalUrl: `${base}/submissions/${submission.id}/decision`,
+    }),
+  );
+
+  return { outcome: result.ok ? "sent" : "failed", to: author.email };
 }
 
 /* ================================================================== *

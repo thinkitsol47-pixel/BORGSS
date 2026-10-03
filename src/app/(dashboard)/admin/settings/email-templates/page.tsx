@@ -99,13 +99,17 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Revision requested",
         when: "An editor records a minor or major revision.",
         to: "The corresponding author, with the decision letter",
-        promisedBy: "Decision screen",
+        // `decisionLetterEmail` — one template for every decision type; a
+        // revision adds its due date.
+        promisedBy: "Decision screen — sent when the decision is recorded",
+        written: true,
       },
       {
         name: "Decision — accepted or declined",
         when: "An editor records a decision.",
-        to: "The corresponding author, with the letter and optionally the reports",
-        promisedBy: "Decision screen",
+        to: "The corresponding author, with the letter",
+        promisedBy: "Decision screen — sent when the decision is recorded",
+        written: true,
       },
       {
         name: "Revision due soon",

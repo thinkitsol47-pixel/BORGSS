@@ -77,10 +77,10 @@ export default function Page() {
         <li>
           <strong>Manuscripts are still sent by email.</strong> The portal is
           built and accounts, submissions and peer review all work inside it,
-          but it is not yet open to authors — editorial decisions are not yet
-          emailed automatically, so an author would not be told what happened
-          to their manuscript. Until it opens, submissions reach the editorial
-          office by email.
+          but it is not yet open to authors — reviewers are not yet invited
+          by email from the portal, so a manuscript could not move through
+          review without the office working around it. Until it opens,
+          submissions reach the editorial office by email.
         </li>
       </ul>
       <p>

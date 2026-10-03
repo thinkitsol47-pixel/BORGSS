@@ -299,13 +299,15 @@ Crossref prefix exists, so it promises nothing.
   message's `replyTo`, and every contact address in `site.config.ts`, is the
   owner's Gmail `ceoborjss@gmail.com`, by the owner's decision. Never point a
   contact address at the domain without a real mailbox behind it.
-  *Sent:* address confirmation, the submission receipt, contact-form and
-  reviewer-application receipts plus office notifications, and password reset
-  — the last one by **Supabase**, through custom SMTP to Resend
-  (`no-reply@borjss.online`), configured in the Supabase dashboard, not here.
-  *Not built, still sent by hand:* decision letters, reviewer invitations and
-  reminders, production hand-offs, account invites (`accountInviteEmail` has no
-  caller). Screens that say a message is not sent now give that reason — "not
+  *Sent:* address confirmation, the submission receipt, **decision letters**
+  (2026-10-02, to the corresponding contributor — only the author-facing
+  letter; the internal note and reviewer identities never reach the
+  template), contact-form and reviewer-application receipts plus office
+  notifications, and password reset — the last one by **Supabase**, through
+  custom SMTP to Resend (`no-reply@borjss.online`), configured in the Supabase
+  dashboard, not here. *Not built, still sent by hand:* reviewer invitations
+  and reminders, the outcome notice to reviewers, production hand-offs,
+  account invites (`accountInviteEmail` has no caller). Screens that say a message is not sent now give that reason — "not
   built" — rather than the old "no domain". `/admin/settings/email-templates`
   lists all 15.
 - Manuscript template files do not exist yet. The templates page says so

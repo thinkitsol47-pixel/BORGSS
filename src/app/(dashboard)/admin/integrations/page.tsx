@@ -81,7 +81,7 @@ const INTEGRATIONS: {
     purpose:
       "Sends every message the platform produces: decision letters, reviewer invitations, password resets, contact-form mail.",
     consequence:
-      "Resend, sending from borjss.online (verified). Sent today: email-address confirmation, password reset, the submission receipt, and the receipts and office notifications for the contact form and reviewer applications. Not built yet, so still sent from the editorial office by hand: decision letters, reviewer invitations and reminders, and account invitations. Replies go to the editorial office's Gmail; the domain has no inbox.",
+      "Resend, sending from borjss.online (verified). Sent today: email-address confirmation, password reset, the submission receipt, decision letters to the corresponding author, and the receipts and office notifications for the contact form and reviewer applications. Not built yet, so still sent from the editorial office by hand: reviewer invitations and reminders, production hand-offs, and account invitations. Replies go to the editorial office's Gmail; the domain has no inbox.",
     state: "connected",
     seeAlso: { label: "Email templates", href: "/admin/settings/email-templates" },
   },

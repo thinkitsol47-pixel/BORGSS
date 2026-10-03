@@ -874,7 +874,7 @@ export const DECISION_TYPES = [
   {
     value: "reject",
     label: "Reject",
-    hint: "Declined after review. The reviewers' comments go with the letter.",
+    hint: "Declined after review. Put what the reviewers found into your letter — only the letter is sent.",
   },
   {
     value: "desk-reject",

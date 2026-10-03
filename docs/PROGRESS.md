@@ -102,8 +102,12 @@ Registration now creates an unconfirmed account and emails a confirmation
 link (`generateLink` → `/verify-email?token_hash=` → POST `/auth/confirm`);
 "Send the link again" works, at most once a minute. Every "no domain" notice
 was re-read: the ones that still say a message is not sent now say why — it
-is not built (decision letters, reviewer invitations, production hand-offs,
-account invites).
+is not built (reviewer invitations, production hand-offs, account invites).
+
+**Decision letters are emailed** (2026-10-02). `recordDecision` sends
+`decisionLetterEmail` to the corresponding contributor after the transaction;
+the outcome screen reports sent / failed / no address and, unless sent, hands
+the letter back to copy. Next up: the reviewer invitation email.
 
 **Still the owner's call, not a code task:** opening
 `/for-authors/how-to-submit` to the portal instead of email. The privacy

@@ -212,15 +212,15 @@ export default async function Page({
               />
 
               <div className="mt-8">
-                {/* Kept: this sits directly above the submit, and an editor
-                    who records a decision believing the author has been told
-                    is the mistake it prevents. Mail works; what does not
-                    exist is a decision-letter email, so nothing is sent. */}
-                <Alert tone="info" title="The letter is still sent by hand">
-                  Recording a decision does <strong>not</strong> email the author
-                  or the reviewers — the portal does not send decision letters
-                  yet. Send the letter from the editorial office, quoting{" "}
+                {/* Sits directly above the submit, because recording is also
+                    sending: the letter leaves the moment this is pressed, and
+                    an editor should know that before, not after. */}
+                <Alert tone="info" title="The letter is emailed to the author">
+                  Recording a decision emails the letter above to the
+                  corresponding author, exactly as written, quoting{" "}
                   <span className="font-medium">{submission.reference}</span>.
+                  The internal note is never sent. The reviewers are{" "}
+                  <strong>not</strong> notified automatically.
                 </Alert>
               </div>
             </>

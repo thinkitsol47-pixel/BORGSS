@@ -130,6 +130,55 @@ export function submissionReceiptEmail(params: {
   };
 }
 
+/**
+ * The decision letter, sent to the corresponding author when an editor records
+ * a decision.
+ *
+ * **Only the letter the editor wrote for the author.** The internal note, the
+ * reviewers' identities and their confidential comments to the editor never
+ * enter this function — it is not given them, so it cannot leak them. The
+ * letter is the editor's own text and is sent exactly as recorded, which is
+ * also what the author's decision page in the portal shows.
+ *
+ * The opening names the decision in plain words, so an author scanning an
+ * inbox knows before reading the letter; a revision carries its due date.
+ */
+export function decisionLetterEmail(params: {
+  to: string;
+  name: string;
+  reference: string;
+  title: string;
+  decisionLabel: string;
+  /** The letter as stored: one string per paragraph. */
+  letter: string[];
+  revisionDueAt?: Date | null;
+  portalUrl: string;
+}): EmailMessage {
+  const due = params.revisionDueAt
+    ? `\n\nPlease return your revised manuscript by ${params.revisionDueAt.toLocaleDateString(
+        "en-GB",
+        { day: "numeric", month: "long", year: "numeric" },
+      )}, through the portal, with a point-by-point response to each comment.`
+    : "";
+
+  return {
+    to: params.to,
+    replyTo: EDITORIAL_OFFICE,
+    subject: `${params.reference} — decision on your manuscript`,
+    text:
+      `Dear ${params.name},\n\n` +
+      `A decision has been reached on your manuscript "${params.title}" (${params.reference}).\n\n` +
+      `Decision: ${params.decisionLabel}${due}\n\n` +
+      `The editor's letter follows.\n\n` +
+      `—\n\n` +
+      params.letter.join("\n\n") +
+      `\n\n—\n\n` +
+      `You can also read this decision in the portal:\n${params.portalUrl}\n\n` +
+      `Please quote ${params.reference} in any reply.` +
+      signOff(),
+  };
+}
+
 /* ------------------------------------------------------- the public queues */
 
 /**
