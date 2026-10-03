@@ -25,20 +25,20 @@ const MILESTONES = [
     title: "Policies adopted",
     body: "The journal adopts a full set of editorial policies covering peer review, publication ethics, authorship, plagiarism, AI-assisted writing and open access — modelled on COPE guidance.",
   },
+  // These two milestones used to read "Inaugural issue published — June
+  // 2026, four articles" and "Second issue and DOI registration — DOIs
+  // registered with Crossref". Neither happened: no issue has been published
+  // and the journal has no Crossref prefix. A history page is exactly what an
+  // indexer reads to check a journal's claims, so it records only what is true.
   {
     year: "2026",
-    title: "Inaugural issue published",
-    body: "Volume 1, Issue 1 appears in June 2026, carrying four peer-reviewed articles spanning development finance, labour economics, education policy and urban studies.",
-  },
-  {
-    year: "2026",
-    title: "Second issue and DOI registration",
-    body: "Volume 1, Issue 2 follows in December. All published articles are assigned DOIs registered with Crossref, making them permanently citable.",
+    title: "Submissions open",
+    body: "The journal opens for submissions to its first volume, with a portal for submission, double-blind review and editorial decisions.",
   },
   {
     year: "Ahead",
-    title: "Indexing and growth",
-    body: "The journal is building the publication record required for evaluation by DOAJ and, in time, Scopus. Submissions continue to be accepted on a rolling basis.",
+    title: "First issue, DOIs and indexing",
+    body: "The first issue is in preparation. Published articles will be assigned DOIs through Crossref, and the journal is building the publication record required for evaluation by DOAJ and, in time, Scopus.",
   },
 ];
 

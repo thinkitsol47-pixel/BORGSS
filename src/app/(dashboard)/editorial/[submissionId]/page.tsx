@@ -167,8 +167,10 @@ export default async function Page({
                 what is missing is a way to write to an author from inside the
                 portal. Say that, not "the portal cannot send mail". */}
             <p className="mt-2 text-sm leading-relaxed text-brand-darker">
-              The portal has no messaging of its own yet, so write to the
-              corresponding author from your own mailbox, quoting{" "}
+              Decision letters are emailed automatically when you record a
+              decision. For anything else the portal has no messaging of its
+              own yet, so write to the corresponding author from your own
+              mailbox, quoting{" "}
               <span className="font-medium">{submission.reference}</span>.
             </p>
             {correspondingEmail(submission) && (

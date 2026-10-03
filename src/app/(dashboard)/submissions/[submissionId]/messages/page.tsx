@@ -34,7 +34,11 @@ export default async function Page({
           <EmptyState
             icon={MessageSquare}
             title="No correspondence yet"
-            description="Messages between you and the editorial office about this manuscript will appear here."
+            // Only the response to reviewers, sent with a revision, is written
+            // here today. The office writes to authors by email, and those
+            // messages are not copied into the portal — so this must not
+            // promise them.
+            description="Your response to reviewers, sent with a revision, will appear here. The editorial office writes to you by email."
           />
         ) : (
           <ol className="space-y-4">

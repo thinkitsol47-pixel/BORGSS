@@ -75,12 +75,10 @@ export default function Page() {
           <Link href="/contact">contact page</Link>.
         </li>
         <li>
-          <strong>Manuscripts are still sent by email.</strong> The portal is
-          built and accounts, submissions and peer review all work inside it,
-          but it is not yet open to authors — reviewers are not yet invited
-          by email from the portal, so a manuscript could not move through
-          review without the office working around it. Until it opens,
-          submissions reach the editorial office by email.
+          <strong>Manuscripts are submitted through the portal.</strong>{" "}
+          Creating an account and submitting store the details listed below.
+          Authors may still submit by email instead, in which case the
+          editorial office enters the manuscript by hand.
         </li>
       </ul>
       <p>

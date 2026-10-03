@@ -175,8 +175,9 @@ export default function IndexingPage() {
       {/* ------------------------------------------------------- honesty */}
       <div className="mt-8">
         <Alert tone="info" title="An honest position">
-          {siteConfig.shortName} published its first issue in 2026. Established
-          indexes such as Scopus and Web of Science require two or more years of
+          {siteConfig.shortName} is newly launched and its first issue is in
+          preparation. Established indexes such as Scopus and Web of Science
+          require two or more years of
           consistent publication before a journal can even be evaluated, so we
           list those as targets rather than claiming coverage we do not have.
           The status of each service below is stated plainly.

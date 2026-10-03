@@ -109,10 +109,12 @@ is not built (reviewer invitations, production hand-offs, account invites).
 the outcome screen reports sent / failed / no address and, unless sent, hands
 the letter back to copy. Next up: the reviewer invitation email.
 
-**Still the owner's call, not a code task:** opening
-`/for-authors/how-to-submit` to the portal instead of email. The privacy
-policy says the portal is not yet open to authors because decisions are not
-emailed automatically; change both together.
+**The portal is the primary submission route** — `/for-authors/how-to-submit`
+and the author guidelines already said so, and the privacy policy, which
+claimed the opposite, was brought into line (2026-10-03). Email remains the
+secondary route. The same sweep corrected `/about/history` (it claimed two
+published issues and Crossref DOIs; neither exists) and `/indexing` ("published
+its first issue in 2026").
 
 ### 2. ~~Galley uploads, proof corrections, revision uploads~~ — all done 2026-09-14
 
