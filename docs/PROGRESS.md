@@ -114,8 +114,20 @@ the letter back to copy.
 link to `/reviews/<assignmentId>`; accept, decline and a returned report each
 email the office (`reviewUpdateOfficeEmail`). The decision form's long-ignored
 "Send the reviewers' comments" checkbox is now honoured in the decision email.
-Still by hand: review reminders, the outcome notice to reviewers, production
-hand-offs, account invites.
+Inviting is now refused for a manuscript's own authors (submitter or a
+contributor address) and for decided or withdrawn manuscripts — both found in
+live testing.
+
+**Review reminders** (2026-10-03): *Send reminder* on the reviewers page, for
+an unanswered invitation or an outstanding report; one per assignment per 24
+hours, enforced from the audit log. Manual only — a scheduled reminder would
+need a cron (Vercel Hobby allows one a day). Still by hand: the outcome notice
+to reviewers, production hand-offs, account invites.
+
+**Ops note:** Resend had `ceoborjss@gmail.com` on its suppression list, so
+every office email and reset link to it was silently dropped while the API
+returned success. If office mail stops, check resend.com → Emails → status,
+then Suppressions.
 
 **The portal is the primary submission route** — `/for-authors/how-to-submit`
 and the author guidelines already said so, and the privacy policy, which

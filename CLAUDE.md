@@ -304,12 +304,14 @@ Crossref prefix exists, so it promises nothing.
   comments-to-author under their labels when "Send the reviewers' comments" is
   ticked — the query selects only `commentsToAuthor` and the label, never
   comments to the editor or a name), **reviewer invitations** (2026-10-03,
-  title and abstract only), an office email when a reviewer accepts, declines
-  or reports, contact-form and reviewer-application receipts plus office
+  title and abstract only), **review reminders** (a *Send reminder* button on
+  the reviewers page — at most one per assignment per 24 hours, the gap read
+  from `review.reminded` audit entries; nothing sends on a schedule), an
+  office email when a reviewer accepts, declines or reports, contact-form and reviewer-application receipts plus office
   notifications, and password reset — the last one by **Supabase**, through
   custom SMTP to Resend (`no-reply@borjss.online`), configured in the Supabase
-  dashboard, not here. *Not built, still sent by hand:* review reminders, the
-  outcome notice to reviewers, production hand-offs, account invites
+  dashboard, not here. *Not built, still sent by hand:* the outcome notice to
+  reviewers, production hand-offs, account invites
   (`accountInviteEmail` has no caller). Screens that say a message is not sent
   give that reason — "not built". `/admin/settings/email-templates` lists
   every message.

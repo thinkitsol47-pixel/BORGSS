@@ -17,6 +17,7 @@ import { sendEmail } from "@/lib/email/send";
 import {
   decisionLetterEmail,
   reviewInvitationEmail,
+  reviewReminderEmail,
 } from "@/lib/email/templates";
 import type { DecisionType } from "@/types";
 
@@ -545,4 +546,96 @@ export async function withdrawAssignment(
   revalidatePath(`/editorial/${assignment.submission.id}/reviewers`);
   revalidatePath(`/editorial/${assignment.submission.id}`);
   return { ok: true };
+}
+
+/** How long after one reminder another can be sent for the same assignment. */
+const REMINDER_GAP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Email a reminder to a reviewer: an unanswered invitation, or a report not
+ * yet returned.
+ *
+ * **At most one a day per assignment.** A reminder is the one email an editor
+ * can send by pressing a button again, and three in an afternoon is how a
+ * journal loses a reviewer. The gap is read from the audit log — every
+ * reminder is written there anyway — so it needs no column of its own.
+ */
+export async function sendReviewReminder(
+  _prev: AssignmentState,
+  formData: FormData,
+): Promise<AssignmentState> {
+  await requireGroup("editorial");
+
+  const assignmentId = String(formData.get("assignmentId") ?? "");
+  if (!isUuid(assignmentId)) {
+    return { ok: false, error: "That assignment could not be found." };
+  }
+
+  const assignment = await db.reviewAssignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      submission: { select: { id: true, reference: true, title: true } },
+      reviewer: { select: { name: true, email: true } },
+      report: { select: { id: true } },
+    },
+  });
+  if (!assignment) {
+    return { ok: false, error: "That assignment could not be found." };
+  }
+  if (
+    assignment.report ||
+    (assignment.status !== "invited" && assignment.status !== "accepted")
+  ) {
+    return {
+      ok: false,
+      error: "There is nothing outstanding to remind this reviewer about.",
+    };
+  }
+
+  const recent = await db.auditEntry.findFirst({
+    where: {
+      action: "review.reminded",
+      targetType: "submission",
+      targetId: assignment.submission.id,
+      occurredAt: { gte: new Date(Date.now() - REMINDER_GAP_MS) },
+      detail: { path: ["assignmentId"], equals: assignment.id },
+    },
+    select: { id: true },
+  });
+  if (recent) {
+    return {
+      ok: false,
+      error: "A reminder already went in the last 24 hours. Give them a day.",
+    };
+  }
+
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const mail = await sendEmail(
+    reviewReminderEmail({
+      to: assignment.reviewer.email,
+      name: assignment.reviewer.name,
+      reference: assignment.submission.reference,
+      title: assignment.submission.title,
+      stage: assignment.status === "invited" ? "invitation" : "report",
+      dueAt: assignment.dueAt,
+      portalUrl: `${base}/reviews/${assignment.id}`,
+    }),
+  );
+  if (!mail.ok) {
+    return { ok: false, error: "The reminder could not be sent. Try again later." };
+  }
+
+  // Recorded only once sent, so a failed send does not start the 24-hour gap.
+  await recordAudit({
+    action: "review.reminded",
+    targetType: "submission",
+    targetId: assignment.submission.id,
+    detail: {
+      reference: assignment.submission.reference,
+      label: assignment.label,
+      assignmentId: assignment.id,
+    },
+  });
+
+  return { ok: true, emailed: true };
 }

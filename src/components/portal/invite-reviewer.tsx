@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { Mail, Send, X } from "lucide-react";
 import {
   inviteReviewer,
+  sendReviewReminder,
   withdrawAssignment,
   type AssignmentState,
 } from "@/app/(dashboard)/editorial/actions";
@@ -146,8 +147,9 @@ export function InviteReviewerButton({
 }
 
 /**
- * Withdraw an existing assignment. A reminder is a pure email action with no
- * template yet, so it stays a note rather than a button until one is built.
+ * Remind or withdraw an existing assignment. A reminder is offered while
+ * something is outstanding — an unanswered invitation, or a report not yet
+ * returned — and the action refuses a second one within 24 hours.
  */
 export function AssignmentActions({
   assignmentId,
@@ -165,8 +167,10 @@ export function AssignmentActions({
     | "withdrawn";
 }) {
   const [state, formAction] = useFormState(withdrawAssignment, initial);
+  const [remind, remindAction] = useFormState(sendReviewReminder, initial);
   const canWithdraw = status === "invited" || status === "accepted";
-  const canRemind = status === "invited" || status === "overdue";
+  const canRemind =
+    status === "invited" || status === "accepted" || status === "overdue";
 
   if (state.ok) {
     return (
@@ -180,11 +184,20 @@ export function AssignmentActions({
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      {canRemind && (
-        <span className="text-xs text-muted-foreground">
-          Reminders go by email — none is sent from here yet.
-        </span>
-      )}
+      {canRemind &&
+        (remind.ok ? (
+          <span className="text-xs font-medium text-success">
+            Reminder emailed to {reviewerName}.
+          </span>
+        ) : (
+          <form action={remindAction}>
+            <input type="hidden" name="assignmentId" value={assignmentId} />
+            <RemindButton />
+            {remind.error && (
+              <span className="ml-2 text-xs text-danger">{remind.error}</span>
+            )}
+          </form>
+        ))}
       {canWithdraw && (
         <form action={formAction}>
           <input type="hidden" name="assignmentId" value={assignmentId} />
@@ -204,6 +217,19 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
     <Button type="submit" size="sm" disabled={pending}>
       {pending ? "Saving…" : children}
     </Button>
+  );
+}
+
+function RemindButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="rounded-lg border border-brand-border px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-brand-tint disabled:opacity-50"
+    >
+      {pending ? "Sending…" : "Send reminder"}
+    </button>
   );
 }
 

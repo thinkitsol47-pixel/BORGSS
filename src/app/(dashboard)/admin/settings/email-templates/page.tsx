@@ -143,10 +143,12 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
       },
       {
         name: "Review reminder",
-        when: "A review is approaching or past its due date.",
+        when: "An editor presses Send reminder on an unanswered invitation or an outstanding review.",
         to: "The reviewer",
-        promisedBy: "Reviewer screens show due dates and overdue states",
-        href: "/reviews",
+        // `reviewReminderEmail`, from the reviewers page. Sent by hand, at most
+        // once a day per assignment — nothing sends it on a schedule yet.
+        promisedBy: "Reviewers page — Send reminder",
+        written: true,
       },
       {
         name: "Thank you, and the outcome",

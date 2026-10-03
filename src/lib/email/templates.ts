@@ -239,6 +239,59 @@ export function reviewInvitationEmail(params: {
 }
 
 /**
+ * A reminder, sent when an editor presses "Send reminder" on an assignment.
+ *
+ * Two cases, because they ask for different things: an invitation still
+ * unanswered asks for a yes or no; an accepted review asks for the report, and
+ * says plainly when it is already late. Same double-blind rule as the
+ * invitation — title only, never the authors.
+ */
+export function reviewReminderEmail(params: {
+  to: string;
+  name: string;
+  reference: string;
+  title: string;
+  stage: "invitation" | "report";
+  dueAt?: Date | null;
+  portalUrl: string;
+}): EmailMessage {
+  const due = params.dueAt
+    ? params.dueAt.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+  const late = params.dueAt ? params.dueAt.getTime() < Date.now() : false;
+
+  const ask =
+    params.stage === "invitation"
+      ? `You were invited to review this manuscript and we have not yet had your answer. ` +
+        `Could you accept or decline? A quick no is far more helpful than no reply — ` +
+        `if you can, name a colleague better placed to review it.`
+      : late
+        ? `Your review was due on ${due} and has not yet reached us. ` +
+          `Please return it as soon as you can, or reply to tell us when to expect it.`
+        : `This is a reminder that your review is due${due ? ` on ${due}` : ""}.`;
+
+  return {
+    to: params.to,
+    replyTo: EDITORIAL_OFFICE,
+    subject:
+      params.stage === "invitation"
+        ? `${params.reference} — reminder: invitation to review`
+        : `${params.reference} — reminder: your review${late ? " is overdue" : ""}`,
+    text:
+      `Dear ${params.name},\n\n` +
+      `Title: ${params.title}\n\n` +
+      `${ask}\n\n` +
+      `${params.portalUrl}\n\n` +
+      `Please quote ${params.reference} in any reply.` +
+      signOff(),
+  };
+}
+
+/**
  * Tells the editorial office that a reviewer accepted, declined or returned a
  * report. Names the reviewer by label ("Reviewer 2"), as the portal does.
  */
