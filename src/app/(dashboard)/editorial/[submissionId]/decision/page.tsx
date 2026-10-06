@@ -221,8 +221,9 @@ export default async function Page({
                   <span className="font-medium">{submission.reference}</span>
                   {" "}— with the reviewers&rsquo; comments to the author if
                   that box is ticked, under their reviewer numbers. The
-                  internal note and comments to the editor are never sent. The
-                  reviewers are <strong>not</strong> notified automatically.
+                  internal note and comments to the editor are never sent.
+                  Reviewers who returned a report are thanked and told the
+                  outcome — not sent the letter.
                 </Alert>
               </div>
             </>

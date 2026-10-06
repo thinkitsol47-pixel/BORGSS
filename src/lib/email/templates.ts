@@ -89,8 +89,8 @@ export function accountInviteEmail(params: {
     text:
       `Dear ${params.name},\n\n` +
       `${params.invitedBy} has created an account for you at ${journalName()}.\n\n` +
-      `To set a password and sign in, use the "Forgot password" link at ${params.signInUrl} ` +
-      `and enter this email address.\n\n` +
+      `To set your password, open ${params.signInUrl} and enter this email address — ` +
+      `we will send you a link. Then sign in with the password you chose.\n\n` +
       `If you were not expecting this, you can ignore this message — an account with no ` +
       `password set cannot be signed in to.` +
       signOff(),
@@ -239,6 +239,35 @@ export function reviewInvitationEmail(params: {
 }
 
 /**
+ * Thanks a reviewer and tells them the outcome, sent to everyone who returned
+ * a report for the round when the editor records the decision.
+ *
+ * The outcome only — not the editor's letter, which is written to the author,
+ * and not the other reviewers' reports. Title and reference, never the
+ * authors, as with every message to a reviewer.
+ */
+export function reviewOutcomeEmail(params: {
+  to: string;
+  name: string;
+  reference: string;
+  title: string;
+  decisionLabel: string;
+}): EmailMessage {
+  return {
+    to: params.to,
+    replyTo: EDITORIAL_OFFICE,
+    subject: `${params.reference} — thank you for your review`,
+    text:
+      `Dear ${params.name},\n\n` +
+      `Thank you for reviewing "${params.title}" (${params.reference}) for ${journalName()}. ` +
+      `Your report has been read and taken into account.\n\n` +
+      `The editor's decision: ${params.decisionLabel}.\n\n` +
+      `Peer review depends on colleagues giving their time as you have, and we are grateful for it.` +
+      signOff(),
+  };
+}
+
+/**
  * A reminder, sent when an editor presses "Send reminder" on an assignment.
  *
  * Two cases, because they ask for different things: an invitation still
@@ -287,6 +316,107 @@ export function reviewReminderEmail(params: {
       `${ask}\n\n` +
       `${params.portalUrl}\n\n` +
       `Please quote ${params.reference} in any reply.` +
+      signOff(),
+  };
+}
+
+/**
+ * Reminds the corresponding author that a revision is due, sent when an
+ * editor presses "Remind the author". Says plainly when it is already late.
+ */
+export function revisionReminderEmail(params: {
+  to: string;
+  name: string;
+  reference: string;
+  title: string;
+  dueAt?: Date | null;
+  portalUrl: string;
+}): EmailMessage {
+  const due = params.dueAt
+    ? params.dueAt.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+  const late = params.dueAt ? params.dueAt.getTime() < Date.now() : false;
+
+  const line = late
+    ? `Your revision was due on ${due} and has not yet reached us. Please upload it as soon as you can, or reply to tell us when to expect it — if you need more time, ask.`
+    : `This is a reminder that your revision is due${due ? ` on ${due}` : ""}. If you need more time, reply to let us know.`;
+
+  return {
+    to: params.to,
+    replyTo: EDITORIAL_OFFICE,
+    subject: `${params.reference} — reminder: your revision${late ? " is overdue" : ""}`,
+    text:
+      `Dear ${params.name},\n\n` +
+      `"${params.title}" (${params.reference})\n\n` +
+      `${line}\n\n` +
+      `Upload the revised manuscript and your response to the reviewers here:\n${params.portalUrl}\n\n` +
+      `Please quote ${params.reference} in any reply.` +
+      signOff(),
+  };
+}
+
+/**
+ * Tells the corresponding author that a production stage is waiting on them —
+ * copyedits to approve, or proofs to check.
+ *
+ * **It carries no file and no link to one.** A galley has no author access in
+ * `lib/storage/entitlement.ts`, and a signed URL must never be emailed; so the
+ * message says the office sends the file separately, which is what happens.
+ * What it adds is that the author learns the stage exists and is theirs to
+ * answer, with the reference to quote.
+ */
+export function productionStageAuthorEmail(params: {
+  to: string;
+  name: string;
+  reference: string;
+  title: string;
+  stage: "copyedit" | "proofread";
+}): EmailMessage {
+  const what =
+    params.stage === "copyedit"
+      ? "has been copyedited and is ready for your approval"
+      : "has been typeset and the proofs are ready for you to check";
+  const ask =
+    params.stage === "copyedit"
+      ? "Please review the edits and reply with your approval, or with any changes you need."
+      : "Please check the proofs carefully — at this stage only corrections of errors can be made — and reply with your corrections or your approval.";
+
+  return {
+    to: params.to,
+    replyTo: EDITORIAL_OFFICE,
+    subject: `${params.reference} — ${params.stage === "copyedit" ? "copyedits for your approval" : "proofs for your approval"}`,
+    text:
+      `Dear ${params.name},\n\n` +
+      `Your accepted manuscript "${params.title}" (${params.reference}) ${what}.\n\n` +
+      `The editorial office will send you the file in a separate email. ${ask}\n\n` +
+      `Please quote ${params.reference} in your reply.` +
+      signOff(),
+  };
+}
+
+/**
+ * Tells the editorial office that an author has uploaded a revision, so it is
+ * not left waiting until someone happens to open the queue. Reference and
+ * round only — the response to reviewers is read in the portal.
+ */
+export function revisionReceivedOfficeEmail(params: {
+  to: string;
+  reference: string;
+  round: number;
+  portalUrl: string;
+}): EmailMessage {
+  return {
+    to: params.to,
+    subject: `${params.reference} — revision ${params.round} received`,
+    text:
+      `The author has uploaded revision ${params.round} of ${params.reference}, ` +
+      `with a response to the reviewers.\n\n` +
+      `The manuscript stays with the author in the queue until an editor moves it on.\n\n` +
+      `Open the manuscript:\n${params.portalUrl}` +
       signOff(),
   };
 }

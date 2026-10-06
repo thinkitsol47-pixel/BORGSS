@@ -75,12 +75,12 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "You have been invited",
         when: "An administrator creates an account for someone.",
         to: "The invited person",
-        // `accountInviteEmail` exists in templates.ts but nothing calls it —
-        // creating an account from the portal is not built. Written, not
-        // sending; the template is ready for the day the screen is.
-        promisedBy: "Users screen — an account sits at status “invited”",
-        href: "/admin/users",
-        critical: true,
+        // `accountInviteEmail`, sent by `createInvitedUser` from
+        // /admin/users/new. It points them to "Forgot password" to set their
+        // own password; nobody else ever knows it.
+        promisedBy: "New account screen — sent when the account is created",
+        href: "/admin/users/new",
+        written: true,
       },
     ],
   },
@@ -112,11 +112,21 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         written: true,
       },
       {
+        name: "Revision received",
+        when: "An author uploads a revised manuscript.",
+        to: "The editorial office",
+        // `revisionReceivedOfficeEmail`, from `uploadRevision`.
+        promisedBy: "Revision upload screen",
+        written: true,
+      },
+      {
         name: "Revision due soon",
-        when: "A revision deadline approaches.",
+        when: "An editor presses Remind the author on a manuscript awaiting its revision.",
         to: "The corresponding author",
-        promisedBy: "Author submission pages show a revision due date",
-        href: "/submissions",
+        // `revisionReminderEmail`. By hand, at most once a day — nothing sends
+        // it on a schedule.
+        promisedBy: "Editor’s manuscript page — Remind the author",
+        written: true,
       },
     ],
   },
@@ -153,8 +163,11 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
       {
         name: "Thank you, and the outcome",
         when: "A decision is reached on a manuscript someone reviewed.",
-        to: "Every reviewer who reported",
-        promisedBy: "Decision screen’s backend notes",
+        to: "Every reviewer who reported in that round",
+        // `reviewOutcomeEmail` — the decision only, not the letter or the
+        // other reviewers' reports.
+        promisedBy: "Decision screen — sent when the decision is recorded",
+        written: true,
       },
     ],
   },
@@ -165,13 +178,17 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
         name: "Copyedits for your approval",
         when: "Copyediting is sent to the author.",
         to: "The corresponding author",
-        promisedBy: "Copyediting stage — “with the author” is a tracked state",
+        // `productionStageAuthorEmail` — tells them it waits on them; the
+        // file itself is still sent by hand. No file or link is ever emailed.
+        promisedBy: "Copyediting stage — Send to author",
+        written: true,
       },
       {
         name: "Proofs for your approval",
         when: "A galley is sent for proofreading.",
         to: "The corresponding author",
-        promisedBy: "Proofreading stage",
+        promisedBy: "Proofreading stage — Send to author",
+        written: true,
       },
       {
         name: "Your article is published",

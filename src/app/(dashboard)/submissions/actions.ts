@@ -17,7 +17,11 @@ import { db, isUuid } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { putFile, isStorageConfigured } from "@/lib/storage";
 import { sendEmail } from "@/lib/email/send";
-import { submissionReceiptEmail } from "@/lib/email/templates";
+import {
+  revisionReceivedOfficeEmail,
+  submissionReceiptEmail,
+} from "@/lib/email/templates";
+import { siteConfig } from "@/config/site.config";
 
 /**
  * Submission wizard Server Actions.
@@ -381,10 +385,22 @@ export async function uploadRevision(
   revalidatePath("/submissions");
   revalidatePath("/editorial/queue");
 
+  // After the write, never able to undo it: the revision has arrived whether
+  // or not the office is told.
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  await sendEmail(
+    revisionReceivedOfficeEmail({
+      to: siteConfig.contact.editorialOffice,
+      reference: submission.reference,
+      round,
+      portalUrl: `${base}/editorial/${submission.id}`,
+    }),
+  );
+
   return {
     status: "success",
     message:
-      "Your revised manuscript and response are with the editorial office. No email is sent from the portal yet, so the editor is not notified automatically — they will see it in their queue.",
+      "Your revised manuscript and response are with the editorial office, and the office has been emailed that they have arrived.",
   };
 }
 

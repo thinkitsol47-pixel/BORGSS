@@ -33,9 +33,9 @@ import type { ProductionStage, StageState } from "@/types";
  * `requireGroup("production")`, because a form post is trivially forged and the
  * disabled states here are a courtesy to the reader, not a control.
  *
- * **No email is sent.** "Send to author" records that the stage went out and
- * when — which is what the queue ages the wait from — and says plainly that the
- * file still travels by hand: mail works, but no production email is built.
+ * **No file is emailed.** "Send to author" records that the stage went out and
+ * when — which is what the queue ages the wait from — and emails the author
+ * that it waits on them; the file itself still travels by hand from the office.
  */
 
 const textareaClass =
@@ -213,10 +213,13 @@ export function StageActions({
             </form>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Sending records the handover and starts the clock. The {label}{" "}
-            itself goes by email from the editorial office, quoting{" "}
-            <span className="font-medium">{reference}</span> — no mail is sent
-            from here.
+            Sending records the handover and starts the clock
+            {stage === "galleys"
+              ? ". "
+              : ", and emails the author that it is waiting on them. "}
+            The {label} itself goes by email from the editorial office, quoting{" "}
+            <span className="font-medium">{reference}</span> — the portal
+            emails no files.
           </p>
           <Outcome state={sendState} />
           <Outcome state={completeState} />

@@ -286,9 +286,8 @@ export default async function Page({
 
       {/* No standing notice here any more. It said roles and status save —
           which is now simply what the screen does, and saying so on every visit
-          is the habit that teaches people to skip these boxes. The one part
-          that was still news, that an account cannot be created, is on
-          /admin/users/new, behind the button that would do it. */}
+          is the habit that teaches people to skip these boxes. Creating and
+          inviting an account lives on /admin/users/new (since 2026-10-03). */}
     </PortalPage>
   );
 }

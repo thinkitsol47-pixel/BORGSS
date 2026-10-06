@@ -6,10 +6,14 @@ import { requireGroup } from "@/lib/auth/require-role";
 import { recordAudit } from "@/lib/api/audit";
 import { assignableRoles, isSuperAdmin, ROLE_LABELS, type Role } from "@/config/roles";
 import {
+  newUserSchema,
   reviewerPoolSchema,
   userRolesSchema,
   userStatusSchema,
 } from "@/lib/validation/schemas";
+import { supabaseAdmin } from "@/lib/auth/supabase";
+import { sendEmail } from "@/lib/email/send";
+import { accountInviteEmail } from "@/lib/email/templates";
 import type { AccountStatus } from "@/types";
 
 /**
@@ -57,6 +61,144 @@ function revalidateUser(userId: string) {
   revalidatePath(`/admin/users/${userId}/edit`);
   // The matrix prints how many accounts hold each role.
   revalidatePath("/admin/roles");
+}
+
+/* ------------------------------------------------------------------ *
+ * Creating and inviting an account.
+ * ------------------------------------------------------------------ */
+
+export type NewUserState = UserAdminState & {
+  values?: Record<string, string>;
+  /** Set on success: the new account's id, and whether the invitation went. */
+  userId?: string;
+  emailed?: boolean;
+};
+
+/**
+ * Create an account for someone and email them an invitation.
+ *
+ * **No password is set, by anyone.** The auth account is created confirmed
+ * (the office vouches for the address) but without a password, so it cannot
+ * be signed in to until its holder sets one through "Forgot password" — the
+ * route the invitation names. `resetPassword` moves the profile from
+ * `invited` to `active` when they do.
+ *
+ * Roles go through `assignableRoles()` exactly as `saveUserRoles` does, so an
+ * administrator cannot mint an administrator by creating one.
+ */
+export async function createInvitedUser(
+  _prev: NewUserState,
+  formData: FormData,
+): Promise<NewUserState> {
+  const actor = await requireGroup("adminOnly");
+
+  const values = {
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    affiliation: String(formData.get("affiliation") ?? ""),
+  };
+  const parsed = newUserSchema.safeParse({
+    ...values,
+    roles: formData.getAll("roles").map(String),
+  });
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: "Please check the highlighted fields.",
+      errors: fieldErrors(parsed.error),
+      values,
+    };
+  }
+  const d = parsed.data;
+
+  const grantable = assignableRoles(actor.roles);
+  const refused = d.roles.filter((r) => !grantable.includes(r));
+  if (refused.length > 0) {
+    return {
+      status: "error",
+      message: `${refused.map((r) => ROLE_LABELS[r]).join(" and ")} is not yours to grant.`,
+      values,
+    };
+  }
+
+  if (await db.user.findUnique({ where: { email: d.email }, select: { id: true } })) {
+    return {
+      status: "error",
+      message: "An account already exists for that address. Open it from the user directory instead.",
+      errors: { email: "Already registered." },
+      values,
+    };
+  }
+
+  const admin = supabaseAdmin();
+  const created = await admin.auth.admin.createUser({
+    email: d.email,
+    email_confirm: true,
+    user_metadata: { name: d.name },
+  });
+  if (created.error || !created.data.user) {
+    const exists =
+      created.error?.code === "email_exists" ||
+      /already|exists|registered/i.test(created.error?.message ?? "");
+    return {
+      status: "error",
+      message: exists
+        ? "An account already exists for that address."
+        : "The account could not be created. Please try again.",
+      values,
+    };
+  }
+
+  try {
+    await db.user.create({
+      data: {
+        id: created.data.user.id,
+        name: d.name,
+        email: d.email,
+        affiliation: d.affiliation || null,
+        status: "invited",
+        roles: { create: d.roles.map((role) => ({ role })) },
+      },
+    });
+  } catch {
+    // Same recovery as registration: an auth account with no profile signs in
+    // to a redirect loop, so remove it and leave the address free.
+    await admin.auth.admin.deleteUser(created.data.user.id);
+    return {
+      status: "error",
+      message: "The account could not be created. Please try again.",
+      values,
+    };
+  }
+
+  await recordAudit({
+    action: "user.invited",
+    targetType: "user",
+    targetId: created.data.user.id,
+    detail: { email: d.email, roles: d.roles },
+  });
+
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const mail = await sendEmail(
+    accountInviteEmail({
+      to: d.email,
+      name: d.name,
+      invitedBy: actor.name,
+      signInUrl: `${base}/forgot-password`,
+    }),
+  );
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/roles");
+
+  return {
+    status: "success",
+    userId: created.data.user.id,
+    emailed: mail.ok,
+    message: mail.ok
+      ? `${d.name}'s account has been created and an invitation emailed to ${d.email}.`
+      : `${d.name}'s account has been created, but the invitation could not be emailed. Write to ${d.email} and ask them to use "Forgot password".`,
+  };
 }
 
 /* ------------------------------------------------------------------ *

@@ -121,8 +121,21 @@ live testing.
 **Review reminders** (2026-10-03): *Send reminder* on the reviewers page, for
 an unanswered invitation or an outstanding report; one per assignment per 24
 hours, enforced from the audit log. Manual only — a scheduled reminder would
-need a cron (Vercel Hobby allows one a day). Still by hand: the outcome notice
-to reviewers, production hand-offs, account invites.
+need a cron (Vercel Hobby allows one a day).
+
+**Reviewers are thanked** (2026-10-03): recording a decision emails
+`reviewOutcomeEmail` to everyone who returned a report in that round — the
+decision only. The outcome screen states how many were emailed.
+
+**Revision received** (2026-10-03): `uploadRevision` emails the office.
+
+**The rest of correspondence** (2026-10-03): "Send to author" in production
+emails the corresponding author (copyedit/proofread only; no file, no link);
+*Remind the author* on the editor's manuscript page while a revision is
+outstanding (once a day, audit-log gap); and `/admin/users/new` now creates an
+account and emails an invitation (`createInvitedUser`, roles through
+`assignableRoles()`). Setting a password moves an account from `invited` to
+`active` — previously nothing ever did. The portal still never emails a file.
 
 **Ops note:** Resend had `ceoborjss@gmail.com` on its suppression list, so
 every office email and reset link to it was silently dropped while the API

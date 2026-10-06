@@ -1174,6 +1174,30 @@ export const userStatusSchema = z
 export type UserStatusInput = z.infer<typeof userStatusSchema>;
 
 /**
+ * Creating an account from `/admin/users/new` and inviting its holder.
+ *
+ * No password field: the person sets their own through the password-reset
+ * flow, which the invitation email points them to. An administrator who knew
+ * someone else's password would be able to act as them.
+ */
+export const newUserSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, "Enter the person's full name.")
+    .max(200),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Please enter a valid email address."),
+  affiliation: z.string().trim().max(300).optional().or(z.literal("")),
+  roles: userRolesSchema.shape.roles,
+});
+
+export type NewUserInput = z.infer<typeof newUserSchema>;
+
+/**
  * Adding an account to the reviewer pool, or editing what it says.
  *
  * **The `reviewer` role and the reviewer pool are two different things**, and

@@ -252,8 +252,7 @@ function DecisionOutcome({
           <span className="break-all font-medium text-foreground">
             {state.letter?.to}
           </span>
-          . Replies come to the editorial office. The reviewers are not
-          notified automatically.
+          . Replies come to the editorial office.
         </p>
       ) : (
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
@@ -266,10 +265,17 @@ function DecisionOutcome({
             : "the message could not be sent"}
           . Send the letter from the editorial office by hand, quoting{" "}
           <span className="font-medium text-foreground">{reference}</span>. It is
-          repeated below to copy across. The reviewers are not notified
-          automatically either.
+          repeated below to copy across.
         </p>
       )}
+
+      {/* Said either way, and counted rather than assumed: a round with no
+          returned report (a desk decision) thanks nobody. */}
+      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+        {state.reviewersThanked
+          ? `${state.reviewersThanked === 1 ? "The reviewer has" : `${state.reviewersThanked} reviewers have`} been thanked by email and told the outcome.`
+          : "No reviewer was emailed — nobody returned a report for this round."}
+      </p>
 
       {!sent && state.values?.letter && (
         <div className="mt-5">

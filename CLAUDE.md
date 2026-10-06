@@ -307,12 +307,18 @@ Crossref prefix exists, so it promises nothing.
   title and abstract only), **review reminders** (a *Send reminder* button on
   the reviewers page — at most one per assignment per 24 hours, the gap read
   from `review.reminded` audit entries; nothing sends on a schedule), an
-  office email when a reviewer accepts, declines or reports, contact-form and reviewer-application receipts plus office
+  office email when a reviewer accepts, declines or reports, **thanks and the
+  outcome** to every reviewer who reported in the decided round (the decision
+  only — never the letter or other reports), an office email when a
+  revision is uploaded, contact-form and reviewer-application receipts plus office
   notifications, and password reset — the last one by **Supabase**, through
   custom SMTP to Resend (`no-reply@borjss.online`), configured in the Supabase
-  dashboard, not here. *Not built, still sent by hand:* the outcome notice to
-  reviewers, production hand-offs, account invites
-  (`accountInviteEmail` has no caller). Screens that say a message is not sent
+  dashboard, not here. Also sent (2026-10-03): a note to the author when
+  copyedits or proofs await them (**no file or link** — the file still goes by
+  hand), a revision reminder (*Remind the author*, once a day), and an account
+  invitation from `/admin/users/new` (no password is set by anyone; the holder
+  uses Forgot password, and `resetPassword` moves `invited` → `active`).
+  Screens that say a message is not sent
   give that reason — "not built". `/admin/settings/email-templates` lists
   every message.
 - Manuscript template files do not exist yet. The templates page says so

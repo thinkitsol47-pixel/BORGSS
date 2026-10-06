@@ -10,10 +10,10 @@ import { reviewerApplicationExists } from "@/lib/api/inbox";
  * Reviewer-application queue actions.
  *
  * **Accept only records the decision.** Turning an accepted application into a
- * `ReviewerProfile` and a `User` account needs the accounts system, which is
- * not built — so this sets `status` and no more, and the screen says that
- * plainly rather than implying a profile now exists. Decline is complete as it
- * is.
+ * `ReviewerProfile` and a `User` account is not automated — so this sets
+ * `status` and no more, and the screen says that plainly. The office creates
+ * the account at /admin/users/new and adds it to the pool from its edit page.
+ * Decline is complete as it is.
  *
  * Re-guarded here because a Server Action is its own entry point.
  */

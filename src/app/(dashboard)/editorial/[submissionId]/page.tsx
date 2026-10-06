@@ -10,6 +10,7 @@ import {
 } from "@/lib/api/editorial";
 import { EditorialHeader } from "@/components/portal/editorial-header";
 import { FileLink } from "@/components/portal/file-link";
+import { RevisionReminderButton } from "@/components/portal/revision-reminder";
 import { Alert, Button } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import type { Contributor, Submission, SubmissionFile } from "@/types";
@@ -140,6 +141,25 @@ export default async function Page({
               </div>
             </dl>
           </div>
+
+          {/* Only while a revision is outstanding — the one state where the
+              manuscript waits on the author and chasing is the editor's move. */}
+          {submission.status === "revision-requested" && (
+            <div className="rounded-xl border border-warning/40 bg-warning/5 p-4">
+              <h2 className="font-serif text-base font-semibold">
+                Revision outstanding
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {submission.revisionDueAt
+                  ? `Due ${formatDate(submission.revisionDueAt)}.`
+                  : "No due date was set."}{" "}
+                At most one reminder a day.
+              </p>
+              <div className="mt-3">
+                <RevisionReminderButton submissionId={submission.id} />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Button

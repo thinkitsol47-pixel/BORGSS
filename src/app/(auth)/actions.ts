@@ -356,6 +356,14 @@ export async function resetPassword(
     };
   }
 
+  // An account the office created sits at `invited` until its holder appears.
+  // Setting a password is that moment — nothing else ever moved it on, so
+  // every invited account would have read "Invited" forever.
+  await db.user.updateMany({
+    where: { id: data.user.id, status: "invited" },
+    data: { status: "active" },
+  });
+
   return {
     status: "success",
     message: "Your password has been changed. You can sign in with it now.",

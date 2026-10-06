@@ -172,9 +172,9 @@ export function RevisionUploadForm({
           already submitted has been told too late. */}
       <p className="text-xs leading-relaxed text-muted-foreground">
         Uploading does not put the manuscript back under review — that is the
-        editor&rsquo;s decision. Nothing is emailed from the portal yet, so the
-        editorial office is not notified automatically; they will see it in
-        their queue against <span className="font-medium">{reference}</span>.
+        editor&rsquo;s decision. The editorial office is emailed when your
+        revision arrives, and the editor picks it up from there under{" "}
+        <span className="font-medium">{reference}</span>.
       </p>
 
       <SubmitButton />

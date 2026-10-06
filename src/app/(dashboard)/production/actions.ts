@@ -13,6 +13,8 @@ import {
   galleyUploadSchema,
   stageAssignSchema,
 } from "@/lib/validation/schemas";
+import { sendEmail } from "@/lib/email/send";
+import { productionStageAuthorEmail } from "@/lib/email/templates";
 import type { ProductionStage, StageState } from "@/types";
 
 /**
@@ -23,11 +25,11 @@ import type { ProductionStage, StageState } from "@/types";
  * can be invoked without the page that renders its form ever loading. Same
  * reasoning as `recordDecision` in editorial.
  *
- * **No email is sent from any of them.** "Send to author" records that the
- * stage went out and when; the file itself still travels by hand from the
- * office, because no production email is built. The screens say so, and `sentToAuthorAt` is what the
- * queue ages the wait from — so the record is useful even while the message is
- * manual.
+ * **Email.** "Send to author" records that the stage went out and when, and
+ * emails the corresponding author that it is waiting on them (2026-10-03). The
+ * file itself still travels by hand from the office — the email carries no
+ * file and no link, for the reasons on `productionStageAuthorEmail`.
+ * `sentToAuthorAt` is what the queue ages the wait from.
  */
 
 export type ProductionState =
@@ -256,13 +258,59 @@ export async function sendStageToAuthor(
 
   if (result.status !== "success") return result;
 
-  // Deliberately does not claim the author was emailed. The row records that
-  // it went out and when; the message itself is still sent by hand.
-  return {
-    status: "success",
-    message:
-      "Recorded as with the author. No email was sent — send the file from the editorial office, quoting the reference.",
-  };
+  // Galleys go to the author only through proofreading; the galleys stage
+  // itself is internal, so it gets no message.
+  const mailed =
+    stage === "galleys" ? null : await notifyAuthorOfStage(submissionId, stage);
+
+  const tail =
+    mailed === "sent"
+      ? "The author has been emailed that it is waiting on them — send the file itself from the editorial office, quoting the reference."
+      : mailed === "failed"
+        ? "The email to the author could not be sent — write to them from the editorial office, with the file, quoting the reference."
+        : mailed === "no-address"
+          ? "No email address is recorded for the corresponding author — write to them by hand, with the file, quoting the reference."
+          : "Send the file from the editorial office, quoting the reference.";
+
+  return { status: "success", message: `Recorded as with the author. ${tail}` };
+}
+
+/** Emails the corresponding author that a stage is waiting on them. */
+async function notifyAuthorOfStage(
+  submissionId: string,
+  stage: "copyedit" | "proofread",
+): Promise<"sent" | "failed" | "no-address"> {
+  const submission = await db.submission.findUnique({
+    where: { id: submissionId },
+    select: {
+      reference: true,
+      title: true,
+      contributors: {
+        select: {
+          givenName: true,
+          familyName: true,
+          email: true,
+          isCorresponding: true,
+        },
+        orderBy: { position: "asc" },
+      },
+    },
+  });
+  const author =
+    submission?.contributors.find((c) => c.isCorresponding) ??
+    submission?.contributors[0];
+  if (!submission || !author?.email) return "no-address";
+
+  const result = await sendEmail(
+    productionStageAuthorEmail({
+      to: author.email,
+      name: `${author.givenName} ${author.familyName}`.trim(),
+      reference: submission.reference,
+      title: submission.title,
+      stage,
+    }),
+  );
+  return result.ok ? "sent" : "failed";
 }
 
 export async function completeStage(

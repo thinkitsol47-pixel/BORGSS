@@ -17,7 +17,9 @@ import { sendEmail } from "@/lib/email/send";
 import {
   decisionLetterEmail,
   reviewInvitationEmail,
+  reviewOutcomeEmail,
   reviewReminderEmail,
+  revisionReminderEmail,
 } from "@/lib/email/templates";
 import type { DecisionType } from "@/types";
 
@@ -63,6 +65,8 @@ export type DecisionState = {
    * rather than assuming. `sent` means the mail provider accepted it.
    */
   letter?: { outcome: "sent" | "failed" | "no-address"; to?: string };
+  /** How many reviewers of the decided round were emailed their thanks. */
+  reviewersThanked?: number;
 };
 
 function fieldErrors(error: {
@@ -265,14 +269,58 @@ export async function recordDecision(
     revisionDueAt,
     includeReports: parsed.data.includeReports === "on",
   });
+  const reviewersThanked = await thankReviewers(submission, decision);
 
   return {
     status: "success",
     decision,
     letter,
+    reviewersThanked,
     message: "The decision is recorded and the manuscript's status has moved.",
     values,
   };
+}
+
+/**
+ * Thanks every reviewer who returned a report for the round being decided,
+ * and tells them the outcome. Returns how many were emailed, so the outcome
+ * screen can say so rather than assume.
+ *
+ * Only reviewers with a report: someone who declined or was withdrawn did not
+ * review it, and "thank you for your review" would be wrong for them.
+ */
+async function thankReviewers(
+  submission: NonNullable<
+    Awaited<ReturnType<typeof getEditorialSubmissionById>>
+  >,
+  decision: DecisionType,
+): Promise<number> {
+  const reviewed = await db.reviewAssignment.findMany({
+    where: {
+      submissionId: submission.id,
+      round: submission.round,
+      report: { isNot: null },
+    },
+    select: { reviewer: { select: { name: true, email: true } } },
+  });
+
+  const decisionLabel =
+    DECISION_TYPES.find((d) => d.value === decision)?.label ?? decision;
+
+  const results = await Promise.all(
+    reviewed.map((a) =>
+      sendEmail(
+        reviewOutcomeEmail({
+          to: a.reviewer.email,
+          name: a.reviewer.name,
+          reference: submission.reference,
+          title: submission.title,
+          decisionLabel,
+        }),
+      ),
+    ),
+  );
+  return results.filter((r) => r.ok).length;
 }
 
 /**
@@ -546,6 +594,79 @@ export async function withdrawAssignment(
   revalidatePath(`/editorial/${assignment.submission.id}/reviewers`);
   revalidatePath(`/editorial/${assignment.submission.id}`);
   return { ok: true };
+}
+
+/**
+ * Remind the corresponding author that a revision is due.
+ *
+ * Only while the manuscript is `revisionRequested` — once the revision is in,
+ * or a decision has moved it on, there is nothing to chase. One per manuscript
+ * per 24 hours, from the audit log, for the same reason as review reminders.
+ */
+export async function sendRevisionReminder(
+  _prev: AssignmentState,
+  formData: FormData,
+): Promise<AssignmentState> {
+  await requireGroup("editorial");
+
+  const submissionId = String(formData.get("submissionId") ?? "");
+  const submission = await getEditorialSubmissionById(submissionId);
+  if (!submission) {
+    return { ok: false, error: "That manuscript could not be found." };
+  }
+  if (submission.status !== "revision-requested") {
+    return { ok: false, error: "No revision is outstanding on this manuscript." };
+  }
+
+  const recent = await db.auditEntry.findFirst({
+    where: {
+      action: "revision.reminded",
+      targetType: "submission",
+      targetId: submission.id,
+      occurredAt: { gte: new Date(Date.now() - REMINDER_GAP_MS) },
+    },
+    select: { id: true },
+  });
+  if (recent) {
+    return {
+      ok: false,
+      error: "A reminder already went in the last 24 hours. Give them a day.",
+    };
+  }
+
+  const author =
+    submission.contributors.find((c) => c.isCorresponding) ??
+    submission.contributors[0];
+  if (!author?.email) {
+    return {
+      ok: false,
+      error: "No email address is recorded for the corresponding author.",
+    };
+  }
+
+  const base = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const mail = await sendEmail(
+    revisionReminderEmail({
+      to: author.email,
+      name: `${author.givenName} ${author.familyName}`.trim(),
+      reference: submission.reference,
+      title: submission.title,
+      dueAt: submission.revisionDueAt ? new Date(submission.revisionDueAt) : null,
+      portalUrl: `${base}/submissions/${submission.id}/revisions`,
+    }),
+  );
+  if (!mail.ok) {
+    return { ok: false, error: "The reminder could not be sent. Try again later." };
+  }
+
+  await recordAudit({
+    action: "revision.reminded",
+    targetType: "submission",
+    targetId: submission.id,
+    detail: { reference: submission.reference },
+  });
+
+  return { ok: true, emailed: true };
 }
 
 /** How long after one reminder another can be sent for the same assignment. */
