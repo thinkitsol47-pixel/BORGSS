@@ -222,6 +222,12 @@ Supabase Postgres (database) · Supabase Auth (50k MAU free) · **Cloudinary**
 (files and images, 25 GB free) · Resend, Brevo the fallback (email, Phase 6).
 All free tiers, none near its limit.
 
+**Two safeguards the free tiers need** (2026-10-06): a daily Vercel cron hits
+`/api/keep-alive` (guarded by `CRON_SECRET`) so Supabase never pauses the
+project for inactivity, and `.github/workflows/db-backup.yml` takes a weekly
+**encrypted** dump (the repo is public — never upload one unencrypted). Restore
+steps are in `docs/PROGRESS.md` → "Database backups".
+
 **Cloudinary is the one with a catch, and it is worse than it looks.** Its
 default is a permanently public URL, so every upload passes
 `type: "authenticated"` and every read mints a short-lived signed URL after

@@ -141,8 +141,33 @@ account and emails an invitation (`createInvitedUser`, roles through
 03:00 UTC, which runs one query so the free Supabase project is never paused
 for inactivity (the first database was lost that way). Needs `CRON_SECRET` in
 Vercel; without it the route refuses every call. Check it under Vercel →
-project → Settings → Cron Jobs. Free Supabase still has **no backups** —
-that is a separate, open item.
+project → Settings → Cron Jobs.
+
+### Database backups (2026-10-06)
+
+`.github/workflows/db-backup.yml` runs every Sunday 21:00 UTC (and on demand
+from Actions → *Database backup* → *Run workflow*). It dumps the `public`
+schema in full plus the data of `auth.users` and `auth.identities`, encrypts
+the bundle with AES-256 under `BACKUP_PASSPHRASE`, and keeps it as an artifact
+for 90 days. **The repo is public, so nothing is ever uploaded unencrypted.**
+Secrets: `BACKUP_DATABASE_URL` (the `DIRECT_URL`) and `BACKUP_PASSPHRASE`
+(kept offline by the owner — lose it and every backup is unreadable). Files
+in Cloudinary are not part of this; they live in Cloudinary.
+
+**To restore** (into the same or a fresh Supabase project):
+
+```bash
+gpg --decrypt borjss-db-YYYY-MM-DD.tar.gz.gpg > backup.tar.gz   # asks for the passphrase
+tar -xzf backup.tar.gz                                           # public.sql, auth.sql
+# Fresh project: drop the empty public schema first, so the dump recreates it.
+psql "$DIRECT_URL" -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
+psql "$DIRECT_URL" -f public.sql
+psql "$DIRECT_URL" -f auth.sql     # restores logins; skip if the accounts already exist
+```
+
+Then point `.env.local` and Vercel at the project, as in the 2026-09-30
+migration above. Test a restore into a throwaway project at least once —
+a backup nobody has restored is a hope, not a backup.
 
 **Ops note:** Resend had `ceoborjss@gmail.com` on its suppression list, so
 every office email and reset link to it was silently dropped while the API
