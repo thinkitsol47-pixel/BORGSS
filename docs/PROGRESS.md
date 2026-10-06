@@ -169,6 +169,29 @@ Then point `.env.local` and Vercel at the project, as in the 2026-09-30
 migration above. Test a restore into a throwaway project at least once —
 a backup nobody has restored is a hope, not a backup.
 
+First run on demand 2026-10-06: success, artifact `borjss-db-2026-10-06`.
+
+### Portal demo data cleared (2026-10-06)
+
+`scripts/clear-demo-portal.mjs --apply` ran against the live database after
+that backup. Gone: all 19 submissions (18 seeded plus the owner's test
+`BORJSS-2026-0002`) with everything cascading from them, the 3 seeded
+editorial issues (two marked "published"), the 39 `User` rows with no login,
+10 orphaned affiliations, and the 2 real uploads in Cloudinary. Kept: the two
+accounts that can sign in (`ceoborjss@gmail.com`, `extra520631@gmail.com`),
+sections, the review form, contact messages and the audit log.
+`submission_reference_seq` was reset, so the first real manuscript is
+`BORJSS-2026-0001`. A signed-in sweep of every audited page on the empty
+database found no NaN, error or demo text.
+
+**Two consequences.** Never run `prisma db seed` against the live database —
+it would put the demo portal back (only the public record is gated by
+`SEED_PUBLIC`). And the audits' detail pages (`/editorial/<id>`,
+`/production/<id>/…`, `/editorial/issues/<id>`) name seeded ids that no longer
+exist live; they are meaningful only against a seeded local database.
+Item 0's production walkthrough now starts from a manuscript submitted for
+real.
+
 **Ops note:** Resend had `ceoborjss@gmail.com` on its suppression list, so
 every office email and reset link to it was silently dropped while the API
 returned success. If office mail stops, check resend.com → Emails → status,

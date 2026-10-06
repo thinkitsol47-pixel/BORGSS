@@ -36,7 +36,7 @@ export default async function Page() {
   return (
     <PortalPage
       title="Statistics"
-      lead="Counted from the manuscripts and articles this platform holds — nothing here is estimated. The totals are small and mostly seeded for development, so a rate moves several points when one manuscript changes; each figure states what it is calculated over."
+      lead="Counted from the manuscripts and articles this platform holds — nothing here is estimated. The journal is new and the totals are small, so a rate moves several points when one manuscript changes; each figure states what it is calculated over."
     >
       {/* The scale caveat comes first. Every figure below is true and almost
           every one is drawn from a sample too small to generalise from, and
@@ -233,7 +233,7 @@ const NOT_MEASURED = [
   {
     title: "Reviewer turnaround, journal-wide",
     detail:
-      "The reviewer database holds a turnaround figure per reviewer, but those are fixture values rather than measurements taken by this system. Aggregating them would produce a journal-wide figure that was never observed.",
+      "Not reported until enough reviews have been completed through this system for an average to mean something. A figure drawn from a handful of reports would describe those reviewers, not the journal.",
   },
 ];
 

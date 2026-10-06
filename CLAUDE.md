@@ -271,8 +271,11 @@ centre verify by writing to the people named.
 **The public record is now empty, and the seed will not refill it.**
 `SEED_PUBLIC=1` is required to seed `Issue`, `Article`, `Post` and
 `BoardMember`; `scripts/clear-public-content.mjs` removes them (dry-run
-unless `--apply`). Portal demo data stays — it is behind a login, and it
-shows the client a workflow that an empty portal cannot demonstrate.
+unless `--apply`). **The portal demo data is gone from the live database too**
+(2026-10-06, `scripts/clear-demo-portal.mjs`): no seeded submissions, issues
+or profiles remain. **Never run `prisma db seed` against the live database** —
+only the public record is gated, so it would refill the portal with
+`@example.edu` accounts that bounce.
 
 When emptying a table, **open the screens in the state they now render in**.
 Three were wrong here: the board page had no empty state and would have shown
@@ -370,8 +373,8 @@ Crossref prefix exists, so it promises nothing.
   single-use token. **Sign-out is POST only** (`/logout`): a GET sign-out link
   was prefetched by Next and ended sessions when the menu opened. **The demo
   door is gone** — no cookie, no one-click entry, no environment bypass. One
-  account can sign in (`ceoborjss@gmail.com`, superAdmin); the other 39 `User`
-  rows are seeded profiles with no credentials.
+  account can sign in (`ceoborjss@gmail.com`, superAdmin); the owner's test
+  account `extra520631@gmail.com` is the only other `User` row.
 - **No Crossref prefix, no ISSN, no e-ISSN.** Every DOI in the app begins
   `10.xxxxx` and resolves nowhere. These three block a DOAJ application;
   `/admin/settings/journal` and `/admin/doi` both say so on screen.
