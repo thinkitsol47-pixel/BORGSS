@@ -137,6 +137,13 @@ account and emails an invitation (`createInvitedUser`, roles through
 `assignableRoles()`). Setting a password moves an account from `invited` to
 `active` — previously nothing ever did. The portal still never emails a file.
 
+**Keep-alive** (2026-10-06): a Vercel cron calls `/api/keep-alive` daily at
+03:00 UTC, which runs one query so the free Supabase project is never paused
+for inactivity (the first database was lost that way). Needs `CRON_SECRET` in
+Vercel; without it the route refuses every call. Check it under Vercel →
+project → Settings → Cron Jobs. Free Supabase still has **no backups** —
+that is a separate, open item.
+
 **Ops note:** Resend had `ceoborjss@gmail.com` on its suppression list, so
 every office email and reset link to it was silently dropped while the API
 returned success. If office mail stops, check resend.com → Emails → status,
