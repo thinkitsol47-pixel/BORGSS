@@ -193,9 +193,11 @@ const TRIGGERS: { group: string; items: Trigger[] }[] = [
       {
         name: "Your article is published",
         when: "An issue containing the article is published.",
-        to: "All contributors",
-        promisedBy: "Issue screens",
+        to: "The corresponding author",
+        // `articlePublishedEmail`, sent by `publishIssue` with the public link.
+        promisedBy: "Issue screen — Publish this issue",
         href: "/editorial/issues",
+        written: true,
       },
     ],
   },

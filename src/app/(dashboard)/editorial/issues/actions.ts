@@ -7,6 +7,10 @@ import { db, isUuid } from "@/lib/db";
 import { requireGroup } from "@/lib/auth/require-role";
 import { recordAudit } from "@/lib/api/audit";
 import { issueSchema } from "@/lib/validation/schemas";
+import { publishIssueRecord } from "@/lib/api/publishing";
+import { sendEmail } from "@/lib/email/send";
+import { articlePublishedEmail } from "@/lib/email/templates";
+import { absoluteUrl } from "@/lib/utils";
 
 /**
  * Issue planning — the write half of `/editorial/issues`.
@@ -17,11 +21,11 @@ import { issueSchema } from "@/lib/validation/schemas";
  * entry point and can be invoked without the page that renders its form ever
  * loading.
  *
- * **Publishing an issue is not here, deliberately.** It mints a DOI for every
- * article it carries and the journal has no Crossref prefix, so `issueSchema`
- * does not accept `published` and no action sets it. An issue seeded as
- * published stays readable and its contents are locked from editing, which is
- * what the screens already do.
+ * **Publishing has its own action, `publishIssue`, and nothing else reaches
+ * the state.** `issueSchema` still does not accept `published`, so the edit
+ * form cannot set it by hand and skip the work publishing does. Articles are
+ * published without DOIs until there is a Crossref prefix — see
+ * `lib/api/publishing.ts`. A published issue's contents are locked.
  *
  * **Two tables carry "which issue is this in", and both are kept in step.**
  * `IssuePlanItem` is the table of contents and its running order;
@@ -211,6 +215,92 @@ export async function saveIssue(
   // editor does is place manuscripts into it, and after editing one they want
   // to see the change against its contents.
   redirect(`/editorial/issues/${savedId}`);
+}
+
+/* ================================================================== *
+ * Publishing.
+ * ================================================================== */
+
+export type PublishState =
+  | { status: "idle" }
+  | { status: "error"; message: string }
+  | { status: "success"; issueSlug: string; count: number; emailed: number };
+
+/**
+ * Publish an issue: every placed manuscript becomes a public article, the
+ * issue appears in the archive, and each corresponding author is told.
+ *
+ * Irreversible from the app — a published article is cited the day it
+ * appears — so the form requires an explicit confirmation, and it is checked
+ * here as well as in the browser.
+ *
+ * Email is sent after the commit and never undoes it: an article that is
+ * live but whose author was not told is a message to resend, not a reason to
+ * take the article down.
+ */
+export async function publishIssue(
+  _prev: PublishState,
+  formData: FormData,
+): Promise<PublishState> {
+  await requireGroup("editorial");
+
+  const issueId = String(formData.get("issueId") ?? "");
+  if (formData.get("confirm") !== "yes") {
+    return {
+      status: "error",
+      message: "Tick the confirmation first. Publishing cannot be undone from here.",
+    };
+  }
+
+  const result = await publishIssueRecord(issueId);
+  if (!result.ok) return { status: "error", message: result.error };
+
+  await recordAudit({
+    action: "issue.published",
+    targetType: "issue",
+    targetId: issueId,
+    detail: {
+      label: result.label,
+      slug: result.issueSlug,
+      articles: result.articles.map((a) => a.reference),
+    },
+  });
+
+  let emailed = 0;
+  for (const a of result.articles) {
+    if (!a.author) continue;
+    const sent = await sendEmail(
+      articlePublishedEmail({
+        to: a.author.email,
+        name: a.author.name,
+        reference: a.reference,
+        title: a.title,
+        issue: result.label,
+        articleUrl: absoluteUrl(`/articles/${a.slug}`),
+      }),
+    );
+    if (sent.ok) emailed++;
+  }
+
+  // Every public surface that lists articles or issues.
+  revalidatePath("/");
+  revalidatePath("/articles");
+  revalidatePath("/issues");
+  revalidatePath("/issues/current");
+  revalidatePath(`/issues/${result.issueSlug}`);
+  revalidatePath("/search");
+  revalidatePath("/sitemap.xml");
+  for (const a of result.articles) revalidatePath(`/articles/${a.slug}`);
+  revalidateIssue(issueId);
+  revalidatePath("/production");
+  revalidatePath("/editorial");
+
+  return {
+    status: "success",
+    issueSlug: result.issueSlug,
+    count: result.articles.length,
+    emailed,
+  };
 }
 
 /* ================================================================== *

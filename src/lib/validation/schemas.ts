@@ -1258,11 +1258,10 @@ export type ReviewerPoolInput = z.infer<typeof reviewerPoolSchema>;
 /**
  * Creating or editing an issue.
  *
- * `published` is deliberately not a value here. Publishing an issue mints a
- * DOI for every article in it, and the journal has no Crossref prefix — an
- * issue marked published would carry `10.xxxxx` identifiers that resolve
- * nowhere. The form offers the two states that are real, and the screen says
- * why the third is missing.
+ * `published` is deliberately not a value here. Publishing is real work —
+ * articles created, bylines frozen, authors emailed — done by `publishIssue`
+ * from the issue's own screen once every manuscript is ready. A state chosen
+ * from a dropdown would mark an issue published with none of that done.
  *
  * Volume, number and year are coerced: a number input posts a string.
  */

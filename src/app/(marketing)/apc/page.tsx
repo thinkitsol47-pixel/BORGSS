@@ -15,7 +15,7 @@ const INCLUDED = [
   "Double-blind peer review by at least two reviewers",
   "Plagiarism and similarity screening",
   "Professional copy-editing and typesetting",
-  "DOI registration with Crossref",
+  "DOI registration with Crossref, once membership is in place",
   "Permanent hosting and third-party preservation",
   "Open access to every reader, forever",
 ];

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarClock, ExternalLink, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth/require-role";
+import { db } from "@/lib/db";
 import {
   getSubmissionById,
   latestDecision,
@@ -25,6 +26,13 @@ export default async function Page({
   if (!submission) notFound();
 
   const decision = latestDecision(submission);
+  // The article's own page, so the author can copy the link to share.
+  const article = submission.articleId
+    ? await db.article.findUnique({
+        where: { id: submission.articleId },
+        select: { slug: true },
+      })
+    : null;
 
   return (
     <div className="px-4 py-6 md:px-8 md:py-10">
@@ -145,14 +153,14 @@ export default async function Page({
         <aside className="space-y-4">
           <ReviewPanel submission={submission} />
 
-          {submission.articleId && (
+          {article && (
             <Card className="p-5">
               <h2 className="font-serif text-base font-semibold">Published</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 This manuscript has a public article page.
               </p>
               <Button
-                href={`/articles`}
+                href={`/articles/${article.slug}`}
                 variant="outline"
                 size="sm"
                 className="mt-3 w-full"

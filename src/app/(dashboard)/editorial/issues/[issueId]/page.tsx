@@ -9,8 +9,10 @@ import {
   getUnscheduledAccepted,
   issueLabel,
 } from "@/lib/api/editorial";
+import { getPublishReadiness } from "@/lib/api/publishing";
 import { StatusBadge } from "@/components/portal/status-badge";
-import { Alert, Badge, EmptyState } from "@/components/ui";
+import { PublishIssue } from "@/components/portal/publish-issue";
+import { Badge, EmptyState } from "@/components/ui";
 import {
   IssueContentsControls,
   PlaceInIssueButton,
@@ -42,9 +44,10 @@ export default async function Page({
   const issue = await getEditorialIssueById(params.issueId);
   if (!issue) notFound();
 
-  const [contents, unscheduled] = await Promise.all([
+  const [contents, unscheduled, readiness] = await Promise.all([
     getIssueContents(issue),
     getUnscheduledAccepted(),
+    issue.state === "published" ? null : getPublishReadiness(issue.id),
   ]);
 
   const short = issue.plannedArticles
@@ -278,19 +281,17 @@ export default async function Page({
           </section>
         )}
 
-        {/* Placing, reordering and removing all save. What genuinely does not
-            work is publishing, and page numbers, so the notice names those two
-            rather than the whole screen — and it is not shown on an issue that
-            is already published, where it would read as a denial of what the
-            badge at the top of the same screen states. */}
-        {issue.state !== "published" && (
-          <Alert tone="warning" title="This issue cannot be published yet">
-            Its contents save, but publishing mints a DOI for every article the
-            issue carries and the journal has no Crossref prefix, so those
-            identifiers would resolve nowhere. Page numbers are not recorded
-            here either — they are settled in production, once the galleys are
-            final.
-          </Alert>
+        {/* Not rendered on a published issue: the badge at the top already
+            says so, and the public link above is what an editor wants then. */}
+        {issue.state !== "published" && readiness && (
+          <section aria-labelledby="publish-heading">
+            <h2 id="publish-heading" className="font-serif text-lg font-semibold">
+              Publish
+            </h2>
+            <div className="mt-3">
+              <PublishIssue issueId={issue.id} readiness={readiness} />
+            </div>
+          </section>
         )}
       </div>
     </div>

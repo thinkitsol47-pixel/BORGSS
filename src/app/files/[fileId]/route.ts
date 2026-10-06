@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { fileAccessFor, galleyAccessFor } from "@/lib/storage/entitlement";
+import {
+  articleGalleyAccess,
+  fileAccessFor,
+  galleyAccessFor,
+} from "@/lib/storage/entitlement";
 import { signedUrlFor, isStorageConfigured } from "@/lib/storage";
 
 /**
@@ -25,6 +29,23 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { fileId: string } },
 ) {
+  // A published article's galley: the one public kind, so it is answered
+  // before the sign-in check. Still minted here, so there remains one place a
+  // signed URL is made. See `articleGalleyAccess`.
+  if (params.fileId.startsWith("article:")) {
+    if (!isStorageConfigured()) {
+      return NextResponse.json(
+        { error: "File storage is not configured." },
+        { status: 503 },
+      );
+    }
+    const access = await articleGalleyAccess(params.fileId.slice("article:".length));
+    if (!access.allowed) {
+      return NextResponse.json({ error: "Not found." }, { status: 404 });
+    }
+    return stream(access.publicId, access.filename, "public");
+  }
+
   const user = await getCurrentUser();
 
   // The middleware does not cover /files, because this route answers for
@@ -55,7 +76,15 @@ export async function GET(
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  const url = signedUrlFor(access.publicId);
+  return stream(access.publicId, access.filename, "private");
+}
+
+async function stream(
+  publicId: string,
+  filename: string,
+  audience: "public" | "private",
+) {
+  const url = signedUrlFor(publicId);
 
   if (!url) {
     return NextResponse.json(
@@ -100,21 +129,28 @@ export async function GET(
   // is author-supplied text, so it is escaped rather than trusted. `filename*`
   // carries the UTF-8 form for names outside ASCII, with the plain `filename`
   // left as the fallback older clients read.
-  const safe = access.filename.replace(/["\\]/g, "_");
-  const encoded = encodeURIComponent(access.filename);
+  const safe = filename.replace(/["\\]/g, "_");
+  const encoded = encodeURIComponent(filename);
+  const isPublic = audience === "public";
 
   return new NextResponse(upstream.body, {
     status: 200,
     headers: {
+      // Cloudinary serves raw files as octet-stream, so a published PDF is
+      // typed by its extension — a browser opens `application/pdf` in place.
       "Content-Type":
-        upstream.headers.get("content-type") ?? "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${safe}"; filename*=UTF-8''${encoded}`,
+        isPublic && filename.endsWith(".pdf")
+          ? "application/pdf"
+          : (upstream.headers.get("content-type") ?? "application/octet-stream"),
+      // A published article opens in the browser; a confidential file downloads.
+      "Content-Disposition": `${isPublic ? "inline" : "attachment"}; filename="${safe}"; filename*=UTF-8''${encoded}`,
       ...(upstream.headers.get("content-length")
         ? { "Content-Length": upstream.headers.get("content-length")! }
         : {}),
-      // Never cached: entitlement is checked per request, and a shared cache
-      // must not serve one reader's manuscript to another.
-      "Cache-Control": "no-store, private",
+      // Confidential files are never cached: entitlement is checked per
+      // request, and a shared cache must not serve one reader's manuscript to
+      // another. A published article is the same for everyone.
+      "Cache-Control": isPublic ? "public, max-age=3600" : "no-store, private",
     },
   });
 }

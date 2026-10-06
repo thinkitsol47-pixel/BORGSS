@@ -399,6 +399,37 @@ export function productionStageAuthorEmail(params: {
 }
 
 /**
+ * Tells the corresponding author their article is published, with its public
+ * link. The link is to the article page, which anyone may open — unlike every
+ * other message here, there is nothing confidential left to protect.
+ *
+ * Says nothing about a DOI: articles are published without one until the
+ * journal has a Crossref prefix, and promising one by date would be a promise
+ * nobody here can keep.
+ */
+export function articlePublishedEmail(params: {
+  to: string;
+  name: string;
+  reference: string;
+  title: string;
+  issue: string;
+  articleUrl: string;
+}): EmailMessage {
+  return {
+    to: params.to,
+    replyTo: EDITORIAL_OFFICE,
+    subject: `Published: ${params.title}`,
+    text:
+      `Dear ${params.name},\n\n` +
+      `Your article "${params.title}" (${params.reference}) has been published in ` +
+      `${journalName()}, ${params.issue}.\n\n` +
+      `It is open access and can be read and shared here:\n${params.articleUrl}\n\n` +
+      `Thank you for publishing with us.` +
+      signOff(),
+  };
+}
+
+/**
  * Tells the editorial office that an author has uploaded a revision, so it is
  * not left waiting until someone happens to open the queue. Reference and
  * round only — the response to reviewers is read in the portal.

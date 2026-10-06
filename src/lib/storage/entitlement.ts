@@ -1,5 +1,5 @@
 import "server-only";
-import { db } from "@/lib/db";
+import { db, isUuid } from "@/lib/db";
 import { inRoleGroup } from "@/config/roles";
 import type { CurrentUser } from "@/lib/auth/current-user";
 
@@ -17,6 +17,30 @@ import type { CurrentUser } from "@/lib/auth/current-user";
 export type FileAccess =
   | { allowed: true; publicId: string; filename: string }
   | { allowed: false; reason: "not-found" | "forbidden" };
+
+/**
+ * A published article's galley — open to everyone, signed in or not.
+ *
+ * The one public branch here, and it takes no user: an open-access article is
+ * meant to be read by anyone. What makes it safe is that an `ArticleGalley`
+ * row exists only once `publishIssueRecord` has published the article, and
+ * only the final galley is ever linked. An unpublished galley has no row here
+ * and stays behind `galleyAccessFor`.
+ */
+export async function articleGalleyAccess(galleyId: string): Promise<FileAccess> {
+  if (!isUuid(galleyId)) return { allowed: false, reason: "not-found" };
+  const galley = await db.articleGalley.findUnique({
+    where: { id: galleyId },
+    select: { storagePath: true, label: true, article: { select: { slug: true } } },
+  });
+  if (!galley?.storagePath) return { allowed: false, reason: "not-found" };
+
+  return {
+    allowed: true,
+    publicId: galley.storagePath,
+    filename: `${galley.article.slug}.${galley.label.toLowerCase()}`,
+  };
+}
 
 /**
  * Who may read a production galley.

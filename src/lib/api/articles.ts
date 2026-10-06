@@ -87,6 +87,7 @@ const articleInclude = {
   },
   references: { orderBy: { position: "asc" } },
   galleys: true,
+  issue: { select: { slug: true } },
 } satisfies Prisma.ArticleInclude;
 
 type ArticleRow = Prisma.ArticleGetPayload<{ include: typeof articleInclude }>;
@@ -137,6 +138,7 @@ function toArticle(row: ArticleRow): Article {
     // The column is `issueNumber`; the type calls it `issue`. Same fact, two
     // names — the seed already translates it the other way.
     issue: row.issueNumber,
+    issueSlug: row.issue?.slug,
     pages: row.pages ?? undefined,
 
     receivedAt: row.receivedAt?.toISOString(),
@@ -211,7 +213,10 @@ export async function getAllArticleSlugs(): Promise<string[]> {
  * has no title, and an empty string would render an empty heading.
  */
 const issueInclude = {
-  articles: { select: { id: true }, orderBy: { publishedAt: "asc" } },
+  articles: {
+    select: { id: true },
+    orderBy: [{ issuePosition: { sort: "asc", nulls: "last" } }, { publishedAt: "asc" }],
+  },
 } satisfies Prisma.IssueInclude;
 
 type IssueRow = Prisma.IssueGetPayload<{ include: typeof issueInclude }>;
@@ -267,7 +272,10 @@ export async function getArticlesForIssue(issue: Issue): Promise<Article[]> {
   const rows = await db.article.findMany({
     where: { issueId: issue.id },
     include: articleInclude,
-    orderBy: { publishedAt: "asc" },
+    // The editor's running order first. Every article published through the
+    // app shares one `publishedAt`, so the date is only a tiebreak (and the
+    // whole order for seeded articles, whose position is null).
+    orderBy: [{ issuePosition: { sort: "asc", nulls: "last" } }, { publishedAt: "asc" }],
   });
   return rows.map(toArticle);
 }

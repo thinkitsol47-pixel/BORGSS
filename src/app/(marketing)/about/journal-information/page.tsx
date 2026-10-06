@@ -136,9 +136,10 @@ export default async function JournalInformationPage() {
       </p>
       <ul>
         <li>
-          <strong>Digital object identifiers.</strong> Every article is assigned
-          a DOI registered with Crossref, so citations resolve even if a URL
-          changes.
+          <strong>Digital object identifiers.</strong> Crossref membership is
+          being arranged. Once it is in place, every article — including those
+          already published — is assigned a registered DOI, so citations
+          resolve even if a URL changes.
         </li>
         <li>
           <strong>Third-party deposit.</strong> Published articles are deposited

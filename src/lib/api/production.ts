@@ -206,6 +206,8 @@ async function targetDatesByIssue(
 
 export async function getProductionJobs(): Promise<ProductionJob[]> {
   const rows = await db.productionJob.findMany({
+    // A published article has left production; its job is history, not work.
+    where: { submission: { status: { not: "published" } } },
     include: productionJobInclude,
   });
   const targets = await targetDatesByIssue(

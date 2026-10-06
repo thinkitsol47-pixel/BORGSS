@@ -59,6 +59,8 @@ export interface Article {
 
   volume: number;
   issue: number;
+  /** The issue's public slug, for linking to its table of contents. */
+  issueSlug?: string;
   pages?: string;
 
   receivedAt?: string;

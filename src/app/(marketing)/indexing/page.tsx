@@ -33,8 +33,8 @@ const SERVICES: {
   {
     name: "Crossref",
     icon: Fingerprint,
-    status: "live",
-    body: "Every article is assigned a DOI registered with Crossref, with full metadata and reference deposits. This makes articles permanently citable and their citations trackable.",
+    status: "planned",
+    body: "Membership is being arranged. Once it is in place, every article — including those already published — is assigned a DOI registered with Crossref, with full metadata, making it permanently citable.",
     href: "https://www.crossref.org",
   },
   {
@@ -109,8 +109,8 @@ const STATUS_META: Record<
 
 const STANDARDS = [
   {
-    title: "Registered DOIs",
-    body: "Every article carries a Crossref DOI with complete metadata, so it resolves permanently and its citations can be tracked.",
+    title: "Permanent article pages",
+    body: "Every article has a permanent page carrying full citation metadata. Crossref DOIs are added to every article once the journal's membership is in place.",
   },
   {
     title: "Published editorial policies",
@@ -288,17 +288,18 @@ export default function IndexingPage() {
           </p>
 
           <p>
-            <strong>Your article will be discoverable.</strong> A registered DOI
-            and Google Scholar coverage mean the article is citable, findable and
-            its citations are counted from the day it is published. That is true
-            now, not at some future date.
+            <strong>Your article will be discoverable.</strong> Every article
+            page carries the citation metadata Google Scholar reads, so it is
+            findable and citable from the day it is published.
           </p>
 
           <p>
-            <strong>Your article will stay citable.</strong> A DOI resolves to
-            the article regardless of how this site&rsquo;s URLs change, so
-            citations do not break. Independent preservation deposit is being
-            arranged in addition to this.
+            <strong>Your article will stay citable.</strong> Each article keeps
+            a permanent page here. A Crossref DOI, which resolves regardless of
+            how this site&rsquo;s URLs change, is added to every article once
+            the journal&rsquo;s membership is in place — including articles
+            already published. Independent preservation deposit is being
+            arranged as well.
           </p>
 
           <p>

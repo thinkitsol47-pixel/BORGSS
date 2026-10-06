@@ -48,39 +48,48 @@ exists twice on purpose — `/for-authors/how-to-submit` for public visitors and
 
 **Everything below "Backend progress" is the detail. This is the short answer.**
 
-### 0. Resume the production walkthrough at Typesetting — the one task in flight
+### 0. The full walkthrough, submission → published article — by the owner
 
-`BORJSS-2026-0079` is mid-walkthrough and is the **first manuscript ever to
-reach production through the app** rather than through the seed. State as of
-the last session:
+The demo manuscripts are gone (2026-10-06), so this starts from a real
+submission: submit → assign reviewer → report → **Accept** → `/production`:
+copyedit → typesetting (upload a PDF galley, **Mark final**) → proofreading
+(complete it; apply or decline every correction) → `/editorial/issues`: create
+an issue, place the manuscript → **Publish this issue** on the issue's page.
+Then check the article page, its PDF, `/issues`, and the author's email.
 
-| Stage | State |
-|---|---|
-| Copyediting | ✅ done — assigned to Hina Aslam, sent to author, approved |
-| Typesetting | ⬜ not started — **resume here** |
-| Proofreading | ⬜ not started |
+### Publishing an issue (2026-10-06) — without DOIs
 
-**The next actions, in order.** Open `/production` → *Digital Payment Adoption
-Among Small Retailers* → **Typesetting** tab:
+The last missing step of the workflow: nothing could ever reach the public
+site. Built on the owner's choice to publish now and add DOIs when a Crossref
+prefix exists. Code: `lib/api/publishing.ts` (readiness + the one transaction),
+`publishIssue` in `editorial/issues/actions.ts`, `components/portal/publish-issue.tsx`,
+`articlePublishedEmail`, and the `article:` branch of `/files/[fileId]`.
+Migration `20261006120000_publish_without_doi` adds `Article.issuePosition`
+and `ArticleGalley.storagePath` (applied live).
 
-1. **Assign and start** → Faisal Nadeem (layoutEditor) → *Start stage*
-2. **Upload galley** → format PDF → any real PDF → *Upload*
-3. **Download it back.** This is the actual test: a galley uploaded through the
-   app lands under `submissions/<id>/galleys`, which `isStoredFile()` accepts,
-   so the row renders a working **Download** link. The four seeded galleys all
-   carry `mock/production/...` paths and correctly render "Uploaded before file
-   storage existed" — **that is not a bug**, and it is why the upload has to
-   come first for there to be anything to download.
-4. **Mark final** → the green *Final* badge
-5. **Proofreading** tab → *Add a correction*, then *Mark applied* on one and
-   *Decline with a reason* on another. Check the reason box refuses an empty
-   submit.
-6. Complete all three stages → `/editorial/issues` to place it in an issue
+**Ready means**, per placed manuscript: accepted/in production, at least one
+author, a final PDF galley, proofreading done, no open proof correction. The
+panel lists what blocks each one and links to its production page; the check
+is repeated inside the transaction.
 
-**Issue planning is built** (item 4 below), so step 6 now lands on a screen
-that saves. The client's original order put production first so the issue
-screen would have something real to place; the seeded accepted manuscripts
-served that purpose, and the placement round was exercised against them.
+Also changed with it: the article page links to **its own** issue (was always
+`/issues/current`) and no longer shows "Views 0 / Downloads 0", which are not
+collected; the production queue drops published jobs and refuses edits to
+them; the author's *Published* card links to the article. Public pages that
+said every article carries a Crossref DOI — `/indexing` (Crossref was marked
+**Active**), `/policies/open-access`, `/about/journal-information`,
+`/for-authors/submission-process`, `/apc` — now say DOIs come once membership
+is in place, including for articles already published.
+
+**Verified** against the live database with a throwaway Vol. 99 manuscript
+(13 logic checks: blocked → ready → published → refused twice) and a test
+server (21 page checks: article, PDF served without login as `application/pdf`
+inline, 404 for unknown ids, issue, archive, sitemap, home, production queue,
+editorial screen), then every row and the Cloudinary file were deleted.
+
+**When the Crossref prefix arrives:** mint `Article.doi` for existing
+articles, create their `DoiRecord`s, deposit, and flip `/indexing`'s Crossref
+row back to live.
 
 ### 1. ~~Buy a domain~~ — done; live at www.borjss.online (2026-09-30 → 10-02)
 

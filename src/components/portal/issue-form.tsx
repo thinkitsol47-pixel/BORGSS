@@ -17,11 +17,10 @@ import type { EditorialIssue } from "@/types";
  * publishes when its contents are ready, and the form says so rather than
  * letting the date read as a commitment made to authors.
  *
- * **There is no "published" state to choose.** Publishing mints a DOI for
- * every article the issue carries, and the journal has no Crossref prefix, so
- * the identifiers would resolve nowhere. Offering the option disabled was
- * considered and rejected — a greyed-out choice is still a promise. The screen
- * says why it is absent instead.
+ * **There is no "published" state to choose.** Publishing creates the public
+ * articles and emails their authors, so it is a button on the issue's own
+ * screen (`publishIssue`), offered once every manuscript is ready — not a
+ * value a form could set without doing any of that.
  *
  * On success the action redirects to the issue, so there is no success state
  * here; only the error path renders, with every field echoed back.
@@ -175,9 +174,9 @@ export function IssueForm({ issue }: { issue?: EditorialIssue }) {
         </div>
 
         <p className="mt-4 max-w-2xl text-sm text-muted-foreground">
-          Publishing an issue is not offered here. It mints a DOI for every
-          article the issue carries, and the journal has no Crossref prefix yet,
-          so those identifiers would resolve nowhere.
+          Publishing is not a state chosen here. Once every manuscript in the
+          issue has a final PDF and finished proofs, the issue&rsquo;s own page
+          offers a Publish button.
         </p>
       </section>
 

@@ -170,8 +170,10 @@ export default function Page() {
       </p>
       <ul>
         <li>
-          <strong>Persistent identifiers.</strong> Every article carries a DOI
-          registered with Crossref, so citations resolve even if this
+          <strong>Persistent identifiers.</strong> Each article has a permanent
+          page on this site. The journal is arranging Crossref membership; once
+          it is in place, every article — including those already published —
+          is given a registered DOI, so citations resolve even if this
           website&rsquo;s addresses change.
         </li>
         <li>

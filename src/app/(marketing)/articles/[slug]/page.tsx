@@ -65,6 +65,18 @@ export default async function ArticlePage({
   if (!article) notFound();
 
   const pdf = article.galleys.find((g) => g.label === "PDF");
+  // Its own issue, not "current": once a second issue is out, an article in
+  // the first would otherwise link to someone else's table of contents.
+  const issueHref = article.issueSlug ? `/issues/${article.issueSlug}` : "/issues";
+  // Views and downloads are not collected (see /admin/statistics), so a
+  // stored 0 is not a measurement and is not shown as one.
+  const metricRows = (
+    [
+      ["Views", article.metrics?.views ?? 0],
+      ["Downloads", article.metrics?.downloads ?? 0],
+      ["Citations", article.metrics?.citations ?? 0],
+    ] as [string, number][]
+  ).filter(([, value]) => value > 0);
   const corresponding = article.contributors.find((c) => c.isCorresponding);
   const typeLabel = TYPE_LABEL[article.type] ?? article.type;
 
@@ -176,7 +188,7 @@ export default async function ArticlePage({
         {/* publication line */}
         <p className="mt-5 text-sm text-muted-foreground">
           <Link
-            href="/issues/current"
+            href={issueHref}
             className="font-medium text-primary hover:underline"
           >
             Vol. {article.volume}, No. {article.issue}
@@ -317,7 +329,7 @@ export default async function ArticlePage({
             </Button>
           )}
 
-          {article.metrics && (
+          {metricRows.length > 0 && (
             <Card>
               <div className="border-b border-brand-border px-4 py-2.5">
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-brand-darker">
@@ -326,15 +338,7 @@ export default async function ArticlePage({
                 </p>
               </div>
               <dl className="divide-y divide-border">
-                {[
-                  ["Views", article.metrics.views],
-                  ["Downloads", article.metrics.downloads],
-                  article.metrics.citations != null
-                    ? ["Citations", article.metrics.citations]
-                    : null,
-                ]
-                  .filter((r): r is [string, number] => Boolean(r))
-                  .map(([label, value]) => (
+                {metricRows.map(([label, value]) => (
                     <div
                       key={label}
                       className="flex items-baseline justify-between px-4 py-2.5"
@@ -364,7 +368,7 @@ export default async function ArticlePage({
                 {new Date(article.publishedAt).getFullYear()}
               </p>
               <Link
-                href="/issues/current"
+                href={issueHref}
                 className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-brand-dark"
               >
                 View table of contents

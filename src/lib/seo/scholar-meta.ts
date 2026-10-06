@@ -38,7 +38,12 @@ export function scholarMetaTags(article: Article): { name: string; content: stri
 
   const pdf = article.galleys.find((g) => g.label === "PDF");
   if (pdf && pdf.url !== "#") {
-    tags.push({ name: "citation_pdf_url", content: pdf.url });
+    // Scholar needs an absolute URL; a galley published through the app is
+    // stored as the site path `/files/article:<id>`.
+    tags.push({
+      name: "citation_pdf_url",
+      content: pdf.url.startsWith("/") ? absoluteUrl(pdf.url) : pdf.url,
+    });
   }
   tags.push({
     name: "citation_abstract_html_url",

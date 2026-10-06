@@ -78,8 +78,10 @@ function parseStage(value: string): ProductionStage | null {
  */
 async function jobFor(submissionId: string) {
   if (!isUuid(submissionId)) return null;
-  return db.productionJob.findUnique({
-    where: { submissionId },
+  // Published means the galley is live: changing it now would change a file
+  // readers are already citing.
+  return db.productionJob.findFirst({
+    where: { submissionId, submission: { status: { not: "published" } } },
     select: { id: true, submissionId: true, submission: { select: { reference: true } } },
   });
 }
@@ -538,9 +540,15 @@ export async function markGalleyFinal(
 
   const galley = await db.productionGalley.findUnique({
     where: { id: galleyId },
-    select: { id: true, jobId: true, format: true, version: true },
+    select: {
+      id: true,
+      jobId: true,
+      format: true,
+      version: true,
+      job: { select: { submission: { select: { status: true } } } },
+    },
   });
-  if (!galley) return NOT_FOUND;
+  if (!galley || galley.job.submission.status === "published") return NOT_FOUND;
 
   await db.$transaction([
     db.productionGalley.updateMany({

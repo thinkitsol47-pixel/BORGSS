@@ -740,6 +740,10 @@ model Article {
   issueId            String?  @db.Uuid
   volume             Int
   issueNumber        Int
+  /// Running order within the issue, copied from `IssuePlanItem.position` at
+  /// publication. Every article in an issue shares one `publishedAt`, so the
+  /// date cannot order a table of contents. Null on seeded articles.
+  issuePosition      Int?
   pages              String?
 
   receivedAt         DateTime?
@@ -818,9 +822,15 @@ model ArticleGalley {
   id        String  @id @default(uuid()) @db.Uuid
   articleId String  @db.Uuid
   label     String
+  /// What a reader is offered. For a galley published through the app this is
+  /// `/files/article:<id>`, never a Cloudinary URL — see `storagePath`.
   url       String
   mimeType  String
   sizeBytes BigInt?
+  /// The Cloudinary `publicId` of the final production galley. The file stays
+  /// `authenticated`; `/files/article:<id>` streams it to anyone once the
+  /// article is published, so there is no public copy and no permanent link.
+  storagePath String?
 
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 

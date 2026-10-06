@@ -24,7 +24,8 @@ that editors are offered from — two links that had no code behind them until
 2026-09-16. **Issue planning landed the same day**, which was the last unbuilt
 feature and the last one that was purely code: an editor can open an issue,
 place accepted manuscripts into it, set their running order and take them out
-again. What is left that money buys: a Crossref prefix, an ISSN and an
+again. **Publishing an issue works too (2026-10-06), without DOIs** — see
+Known gaps. What is left that money buys: a Crossref prefix, an ISSN and an
 e-ISSN. (The domain, `borjss.online`, was bought and is live.)
 `docs/PROGRESS.md` under "Backend progress" is the live record of what has
 landed; `src/lib/api/mock-*.ts` now feeds `prisma/seed.ts` rather than the app.
@@ -347,9 +348,20 @@ Crossref prefix exists, so it promises nothing.
   transaction, or the queue quietly stops showing deadlines. And **positions are
   kept contiguous**: a removal closes the gap, because a hole is invisible on
   screen and breaks the reorder controls silently.
-  *Publishing* an issue stays blocked, and deliberately has no code path at all:
-  `issueSchema` does not accept `published`, so the form cannot reach the state.
-  It mints DOIs and there is no Crossref prefix.
+- **Publishing an issue — built 2026-10-06, without DOIs** (the owner's
+  decision: DOIs are added once there is a Crossref prefix). The issue screen
+  shows a *Publish* panel; `publishIssue` → `lib/api/publishing.ts` checks every
+  placed manuscript (accepted, has authors, a **final PDF galley**, proofread
+  **done**, **no open proof corrections**) and, in one transaction, creates the
+  public `Issue`, an `Article` per manuscript (`doi` null, byline frozen into
+  `ArticleContributor`, running order in `Article.issuePosition`), marks the
+  submissions `published`, and then emails each corresponding author the link.
+  `issueSchema` still does not accept `published` — the dropdown must never
+  skip that work. **Galleys are not copied to a public file:**
+  `ArticleGalley.storagePath` points at the final `authenticated` upload and
+  `/files/article:<id>` streams it to anyone, the one public branch of the
+  files route (`articleGalleyAccess`). Once published, a job leaves the
+  production queue and its galleys cannot be changed.
 - **The reviewer role and the reviewer pool are different things** (built
   2026-09-16). Registration grants `reviewer` to anyone; an editor's shortlist
   comes from `ReviewerProfile`, and nothing but the seed wrote one — an account

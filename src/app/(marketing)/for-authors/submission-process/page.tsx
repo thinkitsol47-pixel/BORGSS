@@ -104,7 +104,6 @@ const STAGES: {
       "Copy-editing for language and house style",
       "Typesetting into the journal template",
       "Author proof — 72 hours to respond",
-      "DOI registration with Crossref",
     ],
   },
   {
@@ -112,7 +111,7 @@ const STAGES: {
     step: "7",
     title: "Publication",
     duration: "On issue release",
-    body: "Your article is published open access, assigned a DOI, and deposited for long-term preservation. You are free to share it immediately.",
+    body: "Your article is published open access on its own permanent page, and you are free to share it immediately. Crossref DOIs are added to published articles once the journal's membership is in place.",
     detail: [
       "Open access from day one, no embargo",
       "Published under CC BY 4.0",
