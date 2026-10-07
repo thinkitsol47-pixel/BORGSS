@@ -256,16 +256,12 @@ three the moment they exist.
   against a server the responsive run had just finished with, and passed
   cleanly on a fresh one. Run each against a freshly started suffixed server,
   and check the "96 of 96" count, not only the finding count.
-- `/production/[submissionId]/copyedit` still says "Downloads are not wired
-  into this screen yet". Downloads *are* wired everywhere else; the correct
-  statement is the one the editorial overview uses — a file with no link is one
-  recorded before storage existed. Harmless today only because every seeded
-  manuscript's files are `mock/...` paths with nothing behind them.
-- **`prisma/db:seed` will undo the 2026-09-16 data repairs** if the drifted
-  fixtures are reseeded — the *fixtures* still carry "Public Policy" and
-  "Psychology". `resolveSectionName()` now maps and rejects these, so a reseed
-  is safe, but `mock-reviewers.ts` itself is still wrong and should be
-  corrected at source.
+- ~~"Downloads are not wired into this screen yet"~~ — fixed 2026-10-07.
+  `/production/[id]/copyedit` and `/editorial/[id]/production` now list files
+  through `FileLink`, like the editorial overview.
+- ~~`mock-reviewers.ts` section drift~~ — corrected at source 2026-10-07 (the
+  four short names now match the `Section` table). `mock-submissions.ts` still
+  says "Gender Studies"; `resolveSectionName()` maps it.
 
 ---
 

@@ -10,6 +10,7 @@ import {
   waitingOn,
 } from "@/lib/api/editorial";
 import { EditorialHeader } from "@/components/portal/editorial-header";
+import { FileLink } from "@/components/portal/file-link";
 import { Badge, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -257,31 +258,29 @@ export default async function Page({
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   The accepted version and everything submitted alongside it.
-                  Downloads are not wired into this screen yet — open them from
-                  the manuscript&rsquo;s own page.
                 </p>
                 <ul className="mt-3 divide-y rounded-xl border">
                   {submission.files.map((f) => (
-                    <li
+                    <FileLink
                       key={f.id}
-                      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 p-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {f.filename}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {f.kind.replace(/-/g, " ")} · uploaded{" "}
-                          {formatDate(f.uploadedAt)}
-                          {f.round > 0 && ` · revision ${f.round}`}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {Math.round(f.sizeBytes / 1024).toLocaleString()} KB
-                      </span>
-                    </li>
+                      id={f.id}
+                      filename={f.filename}
+                      stored={f.stored}
+                      detail={`${f.kind.replace(/-/g, " ")} · ${Math.round(
+                        f.sizeBytes / 1024,
+                      ).toLocaleString()} KB · uploaded ${formatDate(f.uploadedAt)}${
+                        f.round > 0 ? ` · revision ${f.round}` : ""
+                      }`}
+                    />
                   ))}
                 </ul>
+                {submission.files.some((f) => !f.stored) && (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Files without a download link were recorded before the
+                    journal had file storage; the editorial office holds those
+                    by email.
+                  </p>
+                )}
               </section>
             )}
 
